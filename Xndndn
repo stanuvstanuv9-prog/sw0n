@@ -200,16 +200,14 @@ local success, launchError = pcall(function()
     local ExploitsTab = CreateTab("Exploits")
     SwitchToTab("Main")
 
+    -- Полностью переписанная функция переключателей с HSV Color Picker
     local function CreateToggle(parent, labelText, propName, callback, hasColor, colorPropName, colorCallback)
         local Frame = Instance.new("Frame")
         Frame.Size = UDim2.new(1, -5, 0, 35)
         Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
         Frame.BorderSizePixel = 0
         Frame.Parent = parent
-
-        local FCorn = Instance.new("UICorner")
-        FCorn.CornerRadius = UDim.new(0, 4)
-        FCorn.Parent = Frame
+        Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 4)
 
         local Label = Instance.new("TextLabel")
         Label.Size = UDim2.new(1, -90, 1, 0)
@@ -228,10 +226,7 @@ local success, launchError = pcall(function()
         Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
         Btn.Text = ""
         Btn.Parent = Frame
-
-        local BCorn = Instance.new("UICorner")
-        BCorn.CornerRadius = UDim.new(1, 0)
-        BCorn.Parent = Btn
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(1, 0)
 
         Btn.MouseButton1Click:Connect(function()
             Config[propName] = not Config[propName]
@@ -250,60 +245,153 @@ local success, launchError = pcall(function()
             ColorBtn.BackgroundColor3 = Config[colorPropName]
             ColorBtn.Text = ""
             ColorBtn.Parent = Frame
+            Instance.new("UICorner", ColorBtn).CornerRadius = UDim.new(0, 4)
 
-            local CCorn = Instance.new("UICorner")
-            CCorn.CornerRadius = UDim.new(0, 4)
-            CCorn.Parent = ColorBtn
-
+            -- HSV Palette Container
             local Palette = Instance.new("Frame")
-            Palette.Size = UDim2.new(0, 100, 0, 56)
-            Palette.Position = UDim2.new(1, -110, 1, 2)
+            Palette.Size = UDim2.new(0, 160, 0, 100)
+            Palette.Position = UDim2.new(1, -170, 1, 2)
             Palette.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
             Palette.BorderSizePixel = 0
             Palette.ZIndex = 10
             Palette.Visible = false
             Palette.Parent = Frame
+            Instance.new("UICorner", Palette).CornerRadius = UDim.new(0, 4)
 
-            local PCorn = Instance.new("UICorner")
-            PCorn.CornerRadius = UDim.new(0, 4)
-            PCorn.Parent = Palette
+            -- SV (Saturation/Value) Map
+            local SVMap = Instance.new("TextButton")
+            SVMap.Size = UDim2.new(0, 100, 0, 90)
+            SVMap.Position = UDim2.new(0, 5, 0, 5)
+            SVMap.Text = ""
+            SVMap.AutoButtonColor = false
+            SVMap.ZIndex = 11
+            SVMap.Parent = Palette
+            Instance.new("UICorner", SVMap).CornerRadius = UDim.new(0, 3)
 
-            local PGrid = Instance.new("UIGridLayout")
-            PGrid.CellSize = UDim2.new(0, 20, 0, 20)
-            PGrid.CellPadding = UDim2.new(0, 4, 0, 4)
-            PGrid.SortOrder = Enum.SortOrder.LayoutOrder
-            PGrid.Parent = Palette
+            local WhiteOverlay = Instance.new("Frame")
+            WhiteOverlay.Size = UDim2.new(1, 0, 1, 0)
+            WhiteOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            WhiteOverlay.ZIndex = 12
+            WhiteOverlay.Parent = SVMap
+            Instance.new("UICorner", WhiteOverlay).CornerRadius = UDim.new(0, 3)
+            local WhiteGrad = Instance.new("UIGradient")
+            WhiteGrad.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})
+            WhiteGrad.Parent = WhiteOverlay
 
-            local PPad = Instance.new("UIPadding")
-            PPad.PaddingLeft = UDim.new(0, 4)
-            PPad.PaddingTop = UDim.new(0, 4)
-            PPad.Parent = Palette
+            local BlackOverlay = Instance.new("Frame")
+            BlackOverlay.Size = UDim2.new(1, 0, 1, 0)
+            BlackOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            BlackOverlay.ZIndex = 13
+            BlackOverlay.Parent = SVMap
+            Instance.new("UICorner", BlackOverlay).CornerRadius = UDim.new(0, 3)
+            local BlackGrad = Instance.new("UIGradient")
+            BlackGrad.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0)})
+            BlackGrad.Rotation = 90
+            BlackGrad.Parent = BlackOverlay
 
-            local colors = {
-                Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0),
-                Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 255, 0),
-                Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
-                Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 100, 255)
-            }
-            for _, col in ipairs(colors) do
-                local Choice = Instance.new("TextButton")
-                Choice.Size = UDim2.new(0, 20, 0, 20)
-                Choice.BackgroundColor3 = col
-                Choice.Text = ""
-                Choice.ZIndex = 11
-                Choice.Parent = Palette
+            local SVMarker = Instance.new("Frame")
+            SVMarker.Size = UDim2.new(0, 6, 0, 6)
+            SVMarker.AnchorPoint = Vector2.new(0.5, 0.5)
+            SVMarker.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            SVMarker.ZIndex = 14
+            Instance.new("UICorner", SVMarker).CornerRadius = UDim.new(1, 0)
+            local SVStroke = Instance.new("UIStroke", SVMarker)
+            SVStroke.Color = Color3.fromRGB(0, 0, 0)
+            SVMarker.Parent = BlackOverlay
 
-                local ChoiceCorn = Instance.new("UICorner")
-                ChoiceCorn.CornerRadius = UDim.new(0, 3)
-                ChoiceCorn.Parent = Choice
+            -- Hue Map
+            local HueMap = Instance.new("TextButton")
+            HueMap.Size = UDim2.new(0, 20, 0, 90)
+            HueMap.Position = UDim2.new(0, 115, 0, 5)
+            HueMap.Text = ""
+            HueMap.AutoButtonColor = false
+            HueMap.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            HueMap.ZIndex = 11
+            HueMap.Parent = Palette
+            Instance.new("UICorner", HueMap).CornerRadius = UDim.new(0, 3)
+            
+            local HueGrad = Instance.new("UIGradient")
+            HueGrad.Rotation = 90
+            HueGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)),
+                ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+            })
+            HueGrad.Parent = HueMap
 
-                Choice.MouseButton1Click:Connect(function()
-                    Config[colorPropName] = col
-                    ColorBtn.BackgroundColor3 = col
-                    Palette.Visible = false
-                    if colorCallback then colorCallback(col) end
-                end)
+            local HueMarker = Instance.new("Frame")
+            HueMarker.Size = UDim2.new(1, 4, 0, 4)
+            HueMarker.AnchorPoint = Vector2.new(0.5, 0.5)
+            HueMarker.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            HueMarker.ZIndex = 14
+            local HueStroke = Instance.new("UIStroke", HueMarker)
+            HueStroke.Color = Color3.fromRGB(0, 0, 0)
+            HueMarker.Parent = HueMap
+
+            local h, s, v = Config[colorPropName]:ToHSV()
+            SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+
+            local function UpdateColorParams()
+                local newColor = Color3.fromHSV(h, s, v)
+                Config[colorPropName] = newColor
+                ColorBtn.BackgroundColor3 = newColor
+                SVMap.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                
+                HueMarker.Position = UDim2.new(0.5, 0, 1 - h, 0)
+                SVMarker.Position = UDim2.new(s, 0, 1 - v, 0)
+
+                if colorCallback then colorCallback(newColor) end
             end
+
+            UpdateColorParams() -- Set initial positions
+
+            local draggingSV = false
+            local draggingHue = false
+
+            local function handleInput(input, isHue)
+                if isHue then
+                    local y = math.clamp(input.Position.Y - HueMap.AbsolutePosition.Y, 0, HueMap.AbsoluteSize.Y)
+                    h = 1 - (y / HueMap.AbsoluteSize.Y)
+                else
+                    local x = math.clamp(input.Position.X - SVMap.AbsolutePosition.X, 0, SVMap.AbsoluteSize.X)
+                    local y = math.clamp(input.Position.Y - SVMap.AbsolutePosition.Y, 0, SVMap.AbsoluteSize.Y)
+                    s = x / SVMap.AbsoluteSize.X
+                    v = 1 - (y / SVMap.AbsoluteSize.Y)
+                end
+                UpdateColorParams()
+            end
+
+            SVMap.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    draggingSV = true
+                    handleInput(input, false)
+                end
+            end)
+
+            HueMap.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    draggingHue = true
+                    handleInput(input, true)
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    draggingSV = false
+                    draggingHue = false
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    if draggingSV then handleInput(input, false) end
+                    if draggingHue then handleInput(input, true) end
+                end
+            end)
 
             ColorBtn.MouseButton1Click:Connect(function()
                 Palette.Visible = not Palette.Visible
@@ -317,7 +405,7 @@ local success, launchError = pcall(function()
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hrp and hum and hum.MoveDirection.Magnitude > 0 and Config.CFrameSpeed then
             local spd = Config.SpeedValue
-            if Config.AutoSprint and isSprinting then spd = spd * 1.8 end
+            if Config.AutoSprint and isSSprint then spd = spd * 1.8 end
             hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (spd * dt * 10))
         end
     end))
@@ -409,7 +497,7 @@ local success, launchError = pcall(function()
             if LocalPlayer.Character then
                 local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if hum and not Config.CFrameSpeed and hum.WalkSpeed == Config.SprintWalkSpeed then
-                    hum.WalkSpeed = Config.NormalWalkSpeed
+                hum.WalkSpeed = Config.NormalWalkSpeed
                 end
             end
         end
@@ -622,6 +710,7 @@ local success, launchError = pcall(function()
         end
     end))
 
+    -- Исправленная система частиц для Снега и Дождя
     local function UpdateParticles()
         local char = LocalPlayer.Character
         if not char then return end
@@ -633,7 +722,7 @@ local success, launchError = pcall(function()
             if not existing then
                 existing = Instance.new("Attachment", hrp)
                 existing.Name = "LunaWeatherAttach"
-                existing.Position = Vector3.new(0, 15, 0)
+                existing.Position = Vector3.new(0, 20, 0)
                 local pe = Instance.new("ParticleEmitter", existing)
                 pe.Name = "WeatherEmitter"
                 pe.SpreadAngle = Vector2.new(60, 60)
@@ -642,21 +731,25 @@ local success, launchError = pcall(function()
             local pe = existing:FindFirstChild("WeatherEmitter")
             if pe then
                 if Config.ParticleMode == "Snow" then
-                    pe.Texture = "rbxassetid://281983280"
-                    pe.Rate = 400
+                    -- Снег: плавные круглые белые хлопья
+                    pe.Texture = "rbxassetid://281982705"
+                    pe.Rate = 250
                     pe.Speed = NumberRange.new(15, 25)
                     pe.Lifetime = NumberRange.new(3, 5)
-                    pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0.4)})
+                    pe.Size = NumberSequence.new(0.2, 0.4)
                     pe.Transparency = NumberSequence.new(0.1)
                     pe.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+                    pe.Acceleration = Vector3.new(0, -10, 0)
                 else
-                    pe.Texture = "rbxassetid://243660364"
-                    pe.Rate = 600
-                    pe.Speed = NumberRange.new(70, 90)
+                    -- Дождь: быстрые синие полосы/капли
+                    pe.Texture = "rbxassetid://131557004"
+                    pe.Rate = 800
+                    pe.Speed = NumberRange.new(80, 120)
                     pe.Lifetime = NumberRange.new(0.5, 1)
-                    pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 0.1)})
-                    pe.Transparency = NumberSequence.new(0.6)
-                    pe.Color = ColorSequence.new(Color3.fromRGB(180, 220, 255))
+                    pe.Size = NumberSequence.new(0.05, 0.1)
+                    pe.Transparency = NumberSequence.new(0.5)
+                    pe.Color = ColorSequence.new(Color3.fromRGB(180, 200, 255))
+                    pe.Acceleration = Vector3.new(0, -60, 0)
                 end
             end
         else
@@ -726,10 +819,7 @@ local success, launchError = pcall(function()
         WeatherFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
         WeatherFrame.BorderSizePixel = 0
         WeatherFrame.Parent = VisualsTab
-
-        local WCorn = Instance.new("UICorner")
-        WCorn.CornerRadius = UDim.new(0, 4)
-        WCorn.Parent = WeatherFrame
+        Instance.new("UICorner", WeatherFrame).CornerRadius = UDim.new(0, 4)
 
         local WLabel = Instance.new("TextLabel")
         WLabel.Size = UDim2.new(0, 160, 1, 0)
@@ -751,10 +841,7 @@ local success, launchError = pcall(function()
         WBtn.Font = Enum.Font.GothamBold
         WBtn.TextSize = 11
         WBtn.Parent = WeatherFrame
-
-        local WBCorn = Instance.new("UICorner")
-        WBCorn.CornerRadius = UDim.new(0, 4)
-        WBCorn.Parent = WBtn
+        Instance.new("UICorner", WBtn).CornerRadius = UDim.new(0, 4)
 
         WBtn.MouseButton1Click:Connect(function()
             if Config.ParticleMode == "Snow" then
@@ -776,10 +863,7 @@ local success, launchError = pcall(function()
         FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
         FOVFrame.BorderSizePixel = 0
         FOVFrame.Parent = VisualsTab
-
-        local FOVCorn = Instance.new("UICorner")
-        FOVCorn.CornerRadius = UDim.new(0, 4)
-        FOVCorn.Parent = FOVFrame
+        Instance.new("UICorner", FOVFrame).CornerRadius = UDim.new(0, 4)
 
         local FOVLabel = Instance.new("TextLabel")
         FOVLabel.Size = UDim2.new(0, 160, 1, 0)
@@ -801,10 +885,7 @@ local success, launchError = pcall(function()
         FOVBtn.Font = Enum.Font.GothamBold
         FOVBtn.TextSize = 11
         FOVBtn.Parent = FOVFrame
-
-        local FBCorn = Instance.new("UICorner")
-        FBCorn.CornerRadius = UDim.new(0, 4)
-        FBCorn.Parent = FOVBtn
+        Instance.new("UICorner", FOVBtn).CornerRadius = UDim.new(0, 4)
 
         FOVBtn.MouseButton1Click:Connect(function()
             if Config.FOVValue == 70 then
@@ -828,10 +909,7 @@ local success, launchError = pcall(function()
         TpFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
         TpFrame.BorderSizePixel = 0
         TpFrame.Parent = ExploitsTab
-
-        local TpCorn = Instance.new("UICorner")
-        TpCorn.CornerRadius = UDim.new(0, 4)
-        TpCorn.Parent = TpFrame
+        Instance.new("UICorner", TpFrame).CornerRadius = UDim.new(0, 4)
 
         local TpBtn = Instance.new("TextButton")
         TpBtn.Size = UDim2.new(1, -10, 0, 24)
@@ -842,10 +920,7 @@ local success, launchError = pcall(function()
         TpBtn.Font = Enum.Font.GothamMedium
         TpBtn.TextSize = 12
         TpBtn.Parent = TpFrame
-
-        local TpBtnCorn = Instance.new("UICorner")
-        TpBtnCorn.CornerRadius = UDim.new(0, 4)
-        TpBtnCorn.Parent = TpBtn
+        Instance.new("UICorner", TpBtn).CornerRadius = UDim.new(0, 4)
 
         TpBtn.MouseButton1Click:Connect(function()
             local character = LocalPlayer.Character
@@ -881,4 +956,4 @@ end)
 
 if not success then
     warn("[Luna V4] Ошибка запуска: " .. tostring(launchError))
-end
+end    
