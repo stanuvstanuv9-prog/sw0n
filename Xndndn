@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
@@ -13,16 +14,19 @@ local Camera = Workspace.CurrentCamera
 local Config = {
     -- Main
     CFrameSpeed = false,
-    SpeedValue = 2.5, -- Множитель CFrame скорости (не WalkSpeed)
+    SpeedValue = 2.5,
     NoFall = false,
     Noclip = false,
+    AntiAFK = false, -- Новый тумблер Анти-кика
     -- Visuals
     ESP = false,
-    Box = false, -- Исправленный тумблер для боксов
+    Box = false, 
+    Tracers = false, -- Новый тумблер линий
+    Fullbright = false, -- Новый тумблер яркости
     ObjectESP = false,
     FOVValue = 70,
     CustomSky = false,
-    SkyColor = Color3.fromRGB(120, 100, 255), -- Фиолетово-лунный оттенок неба
+    SkyColor = Color3.fromRGB(120, 100, 255),
     -- Exploits
     PerfectSkillCheck = false
 }
@@ -30,6 +34,17 @@ local Config = {
 local connections = {}
 local tabs = {}
 local tabButtons = {}
+local tracerCache = {} -- Кэш для отрисовки линий
+
+-- Сохраняем дефолтные настройки света для отключения Fullbright
+local originalLighting = {
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows
+}
 
 -- [[ СОЗДАНИЕ ИНТЕРФЕЙСА С ВКЛАДКАМИ ]] --
 local ScreenGui = Instance.new("ScreenGui")
@@ -51,7 +66,6 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Левый сайдбар для вкладок
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 120, 1, 0)
 Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
@@ -82,14 +96,12 @@ TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabListLayout.Padding = UDim.new(0, 4)
 TabListLayout.Parent = TabBtnContainer
 
--- Правая основная часть для контента
 local ContentFrame = Instance.new("Frame")
 ContentFrame.Size = UDim2.new(1, -130, 1, -10)
 ContentFrame.Position = UDim2.new(0, 125, 0, 5)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.Parent = MainFrame
 
--- Функция переключения вкладок
 local function SwitchToTab(tabName)
     for name, frame in pairs(tabs) do
         frame.Visible = (name == tabName)
@@ -99,7 +111,6 @@ local function SwitchToTab(tabName)
     end
 end
 
--- Функция создания вкладки
 local function CreateTab(name)
     local TabButton = Instance.new("TextButton")
     TabButton.Size = UDim2.new(1, 0, 0, 32)
@@ -133,13 +144,11 @@ local function CreateTab(name)
     return Page
 end
 
--- Создаем 3 вкладки
 local MainTab = CreateTab("Main")
 local VisualsTab = CreateTab("Visuals")
 local ExploitsTab = CreateTab("Exploits")
-SwitchToTab("Main") -- Первая по умолчанию
+SwitchToTab("Main")
 
--- Универсальный элемент интерфейса (Toggle)
 local function CreateToggle(parent, name, propName, callback)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, -5, 0, 35)
@@ -184,7 +193,6 @@ end
 
 -- [[ НАПОЛНЕНИЕ ВКЛАДКИ: MAIN ]] --
 
--- Реализация правильного CFrame Speedhack
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
     if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -195,7 +203,6 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
     end
 end))
 
--- Реализация NoFall & Noclip
 table.insert(connections, RunService.RenderStepped:Connect(function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -213,14 +220,32 @@ table.insert(connections, RunService.Stepped:Connect(function()
     end
 end))
 
+-- [[ ЛЕГКОВЕСНЫЙ ANTI-AFK ]] --
+local antiAfkConnection
+local function toggleAntiAFK(state)
+    if state then
+        if not antiAfkConnection then
+            antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new(0,0))
+            end)
+        end
+    else
+        if antiAfkConnection then
+            antiAfkConnection:Disconnect()
+            antiAfkConnection = nil
+        end
+    end
+end
+
 CreateToggle(MainTab, "Кастомный Speedhack (CFrame)", "CFrameSpeed")
 CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
 CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
+CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
 
 
 -- [[ НАПОЛНЕНИЕ ВКЛАДКИ: VISUALS ]] --
 
--- Функция динамического изменения FOV
 local function updateFOV()
     table.insert(connections, RunService.RenderStepped:Connect(function()
         if Camera.FieldOfView ~= Config.FOVValue then
@@ -279,56 +304,71 @@ local function applySkyMod(state)
         Lighting.OutdoorAmbient = Config.SkyColor
         Lighting.FogColor = Config.SkyColor
     else
-        Lighting.Ambient = Color3.fromRGB(128, 128, 128)
-        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
     end
 end
 
--- [[ СВЕРХТОЧНАЯ ДИНАМИЧЕСКАЯ СИСТЕМА ОПРЕДЕЛЕНИЯ РОЛИ ]] --
+-- [[ ЛЕГКОВЕСНЫЙ FULLBRIGHT ]] --
+table.insert(connections, RunService.RenderStepped:Connect(function()
+    if Config.Fullbright then
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.Brightness = 3
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 999999
+        Lighting.GlobalShadows = false
+    end
+end))
+
+local function toggleFullbright(state)
+    if not state then
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.ClockTime = originalLighting.ClockTime
+        Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.GlobalShadows = originalLighting.GlobalShadows
+    end
+end
+
+-- Динамическая проверка роли (Маньяк / Выживший)
 local function checkIsKiller(player, character)
     if not player then return false end
-    
-    -- 1. Проверка по названию команды
     if player.Team then
         local tName = player.Team.Name:lower()
-        if tName:find("kill") or tName:find("slash") or tName:find("beast") or tName:find("murder") or tName:find("hunter") or tName:find("monster") then
+        if tName:find("kill") or tName:find("slash") or tName:find("beast") or tName:find("murder") or tName:find("hunter") then
             return true
         end
     end
-    
-    -- 2. Проверка по встроенным атрибутам Roblox (работает во многих плейсах)
     if player:GetAttribute("Role") == "Killer" or player:GetAttribute("IsKiller") == true then return true end
     if character and (character:GetAttribute("Role") == "Killer" or character:GetAttribute("IsKiller") == true) then return true end
     
-    -- 3. Проверка по оружию в руках или инвентаре (исключая мирные предметы)
     local function scansForWeapons(container)
         if not container then return false end
         for _, item in ipairs(container:GetChildren()) do
             if item:IsA("Tool") then
                 local iName = item.Name:lower()
-                if not iName:find("flashlight") and not iName:find("medkit") and not iName:find("cola") and not iName:find("camera") and not iName:find("card") then
-                    return true -- Если у него в руках оружие (не фонарик/аптечка), то он маньяк
+                if not iName:find("flashlight") and not iName:find("medkit") and not iName:find("cola") and not iName:find("camera") then
+                    return true
                 end
             end
         end
         return false
     end
-    
     if character and scansForWeapons(character) then return true end
     if player:FindFirstChild("Backpack") and scansForWeapons(player.Backpack) then return true end
-    
     return false
 end
 
--- [[ ЕДИНЫЙ ПОТОК ОБНОВЛЕНИЯ ВИЗУАЛОВ (БЕЗ ЛАГОВ И ОШИБОК) ]] --
+-- [[ СИНХРОННЫЙ ДВИЖОК ВИЗУАЛОВ (ESP, BOX & TRACERS) ]] --
 task.spawn(function()
-    while task.wait(0.3) do -- Постоянный цикл обновления каждые 0.3 сек
+    while task.wait(0.1) do
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
                 local character = player.Character
-                if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChildOfClass("Humanoid") then
+                if character and character:FindFirstChild("HumanoidRootPart") then
                     
-                    -- Создаем или находим контейнер для наших чит-объектов внутри игрока
                     local folder = character:FindFirstChild("Luna_Visuals_Container")
                     if not folder then
                         folder = Instance.new("Folder")
@@ -336,12 +376,11 @@ task.spawn(function()
                         folder.Parent = character
                     end
                     
-                    -- Запускаем точную проверку роли в реальном времени
                     local isKiller = checkIsKiller(player, character)
                     local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
                     local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
                     
-                    -- ОБРАБОТКА НИК ESP (НАДПИСИ)
+                    -- ТЕКСТ ESP
                     local textESP = folder:FindFirstChild("Luna_Text")
                     if Config.ESP then
                         if not textESP then
@@ -349,7 +388,6 @@ task.spawn(function()
                             textESP.Name = "Luna_Text"
                             textESP.Size = UDim2.new(0, 160, 0, 40)
                             textESP.AlwaysOnTop = true
-                            
                             local label = Instance.new("TextLabel")
                             label.Name = "Label"
                             label.Size = UDim2.new(1, 0, 1, 0)
@@ -358,7 +396,6 @@ task.spawn(function()
                             label.TextSize = 12
                             label.TextStrokeTransparency = 0
                             label.Parent = textESP
-                            
                             textESP.Parent = folder
                         end
                         textESP.Adornee = character.HumanoidRootPart
@@ -368,13 +405,13 @@ task.spawn(function()
                         if textESP then textESP:Destroy() end
                     end
                     
-                    -- ОБРАБОТКА БОКС ESP (ПОДДСВЕТКА СТЕН)
+                    -- БОКС ESP (HIGHLIGHT)
                     local boxESP = folder:FindFirstChild("Luna_Highlight")
                     if Config.Box then
                         if not boxESP then
                             boxESP = Instance.new("Highlight")
                             boxESP.Name = "Luna_Highlight"
-                            boxESP.FillTransparency = 1 -- Прозрачный внутри (только рамка-бокс)
+                            boxESP.FillTransparency = 1
                             boxESP.OutlineTransparency = 0
                             boxESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                             boxESP.Parent = folder
@@ -391,14 +428,56 @@ task.spawn(function()
     end
 end)
 
+-- [[ ОТРИСОВКА ЛИНИЙ (TRACERS) НА СВЕРХПЛАВНОМ ДВИЖКЕ ]] --
+table.insert(connections, RunService.RenderStepped:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            
+            if Config.Tracers and root and pcall(function() return Drawing end) then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                if onScreen then
+                    local tracer = tracerCache[player]
+                    if not tracer then
+                        tracer = Drawing.new("Line")
+                        tracer.Thickness = 1
+                        tracer.Transparency = 1
+                        tracerCache[player] = tracer
+                    end
+                    
+                    local isKiller = checkIsKiller(player, character)
+                    tracer.Color = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
+                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+                    tracer.Visible = true
+                else
+                    if tracerCache[player] then tracerCache[player].Visible = false end
+                end
+            else
+                if tracerCache[player] then tracerCache[player].Visible = false end
+            end
+        end
+    end
+    
+    -- Чистка кэша линий при выходе игрока
+    for player, tracer in pairs(tracerCache) do
+        if not Players:FindFirstChild(player.Name) then
+            tracer:Remove()
+            tracerCache[player] = nil
+        end
+    end
+end))
+
 CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP")
-CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box") -- Теперь работает идеально
+CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box")
+CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers") -- Кнопка линий
+CreateToggle(VisualsTab, "Полная яркость (Fullbright)", "Fullbright", toggleFullbright) -- Кнопка яркости
 CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
 
 
 -- [[ НАПОЛНЕНИЕ ВКЛАДКИ: EXPLOITS ]] --
 
--- Умный авто-скиллчек
 local function togglePerfectSkillCheck(state)
     if not state then return end
     local pGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -432,4 +511,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[LUNA V4]: Перезапуск успешен. Все баги устранены!")
+print("[LUNA V4]: Успешно добавлены Tracers, Fullbright и Anti-AFK. Скрипт готов к тестам!")
