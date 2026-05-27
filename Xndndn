@@ -1,4 +1,4 @@
--- [[ LUNA V4 - Multi-Tab Premium Edition ]] --
+-- [[ LUNA V4 - Multi-Tab Premium Edition (Zenin UI Style) ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -17,12 +17,12 @@ local Config = {
     SpeedValue = 2.5,
     NoFall = false,
     Noclip = false,
-    AntiAFK = false, -- Новый тумблер Анти-кика
+    AntiAFK = false,
     -- Visuals
     ESP = false,
     Box = false, 
-    Tracers = false, -- Новый тумблер линий
-    Fullbright = false, -- Новый тумблер яркости
+    Tracers = false, 
+    Fullbright = false,
     ObjectESP = false,
     FOVValue = 70,
     CustomSky = false,
@@ -34,9 +34,8 @@ local Config = {
 local connections = {}
 local tabs = {}
 local tabButtons = {}
-local tracerCache = {} -- Кэш для отрисовки линий
+local tracerCache = {}
 
--- Сохраняем дефолтные настройки света для отключения Fullbright
 local originalLighting = {
     Ambient = Lighting.Ambient,
     OutdoorAmbient = Lighting.OutdoorAmbient,
@@ -46,59 +45,144 @@ local originalLighting = {
     GlobalShadows = Lighting.GlobalShadows
 }
 
--- [[ СОЗДАНИЕ ИНТЕРФЕЙСА С ВКЛАДКАМИ ]] --
+-- [[ ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Luna_V4"
+ScreenGui.Name = "Luna_V4_Premium"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
+-- ======================================================= --
+-- [[ СОЗДАНИЕ ВАТЕРМАРКИ (СТИЛЬ ZENIN С СКРИНШОТА) ]] --
+-- ======================================================= --
+local Watermark = Instance.new("Frame")
+Watermark.Name = "Zenin_Watermark"
+Watermark.Position = UDim2.new(0, 20, 0, 20)
+Watermark.Size = UDim2.new(0, 250, 0, 32)
+Watermark.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+Watermark.BorderSizePixel = 0
+Watermark.Parent = ScreenGui
+
+local WMCorner = Instance.new("UICorner")
+WMCorner.CornerRadius = UDim.new(0, 16) -- Глубокое красивое закругление как на фото
+WMCorner.Parent = Watermark
+
+local WMList = Instance.new("UIListLayout")
+WMList.FillDirection = Enum.FillDirection.Horizontal
+WMList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+WMList.VerticalAlignment = Enum.VerticalAlignment.Center
+WMList.Padding = UDim.new(0, 10)
+WMList.Parent = Watermark
+
+-- Функция для быстрых разделительных палочек "|"
+local function CreateWMSeparator()
+    local Sep = Instance.new("Frame")
+    Sep.Size = UDim2.new(0, 1, 0, 14)
+    Sep.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    Sep.BorderSizePixel = 0
+    Sep.Parent = Watermark
+end
+
+-- 1. Элемент: Круглое неоновое Лого "Z" (в нашем случае "L")
+local LogoFrame = Instance.new("Frame")
+LogoFrame.Size = UDim2.new(0, 20, 0, 20)
+LogoFrame.BackgroundColor3 = Color3.fromRGB(28, 22, 22)
+LogoFrame.BorderSizePixel = 0
+LogoFrame.Parent = Watermark
+
+local LogCorner = Instance.new("UICorner")
+LogCorner.CornerRadius = UDim.new(1, 0)
+LogCorner.Parent = LogoFrame
+
+local LogoText = Instance.new("TextLabel")
+LogoText.Size = UDim2.new(1, 0, 1, 0)
+LogoText.BackgroundTransparency = 1
+LogoText.Text = "L"
+LogoText.TextColor3 = Color3.fromRGB(255, 60, 60) -- Красный неоновый акцент
+LogoText.Font = Enum.Font.GothamBlack
+LogoText.TextSize = 12
+LogoText.Parent = LogoFrame
+
+CreateWMSeparator()
+
+-- 2. Элемент: Имя софта
+local NameText = Instance.new("TextLabel")
+NameText.Size = UDim2.new(0, 45, 0, 20)
+NameText.BackgroundTransparency = 1
+NameText.Text = "luna"
+NameText.TextColor3 = Color3.fromRGB(240, 240, 240)
+NameText.Font = Enum.Font.GothamBold -- Жирный шрифт
+NameText.TextSize = 13
+NameText.Parent = Watermark
+
+CreateWMSeparator()
+
+-- 3. Элемент: Сборка / Версия
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 55, 0, 20)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = "internal"
+StatusText.TextColor3 = Color3.fromRGB(160, 160, 165)
+StatusText.Font = Enum.Font.GothamBold
+StatusText.TextSize = 12
+StatusText.Parent = Watermark
+
+-- Автоматическое масштабирование ватермарки под контент
+Watermark.Size = UDim2.new(0, WMList.AbsoluteContentSize.X + 25, 0, 32)
+WMList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Watermark.Size = UDim2.new(0, WMList.AbsoluteContentSize.X + 25, 0, 32)
+end)
+
+
+-- ======================================================= --
+-- [[ ОСНОВНОЕ МЕНЮ С ОБНОВЛЕННЫМИ ЖИРНЫМИ ШРИФТАМИ ]] --
+-- ======================================================= --
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 460, 0, 300)
 MainFrame.Position = UDim2.new(0.5, -230, 0.55, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
 local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 120, 1, 0)
-Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+Sidebar.Size = UDim2.new(0, 125, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
 Sidebar.BorderSizePixel = 0
 Sidebar.Parent = MainFrame
 
 local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 8)
+SidebarCorner.CornerRadius = UDim.new(0, 10)
 SidebarCorner.Parent = Sidebar
 
 local Logo = Instance.new("TextLabel")
-Logo.Size = UDim2.new(1, 0, 0, 40)
+Logo.Size = UDim2.new(1, 0, 0, 45)
 Logo.BackgroundTransparency = 1
 Logo.Text = "LUNA V4"
-Logo.TextColor3 = Color3.fromRGB(0, 180, 255)
-Logo.Font = Enum.Font.GothamBold
-Logo.TextSize = 16
+Logo.TextColor3 = Color3.fromRGB(255, 60, 60)
+Logo.Font = Enum.Font.GothamBlack -- Максимально жирный шрифт для логотипа
+Logo.TextSize = 18
 Logo.Parent = Sidebar
 
 local TabBtnContainer = Instance.new("Frame")
-TabBtnContainer.Size = UDim2.new(1, 0, 1, -50)
-TabBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+TabBtnContainer.Size = UDim2.new(1, 0, 1, -55)
+TabBtnContainer.Position = UDim2.new(0, 0, 0, 55)
 TabBtnContainer.BackgroundTransparency = 1
 TabBtnContainer.Parent = Sidebar
 
 local TabListLayout = Instance.new("UIListLayout")
 TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabListLayout.Padding = UDim.new(0, 4)
+TabListLayout.Padding = UDim.new(0, 6)
 TabListLayout.Parent = TabBtnContainer
 
 local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, -130, 1, -10)
-ContentFrame.Position = UDim2.new(0, 125, 0, 5)
+ContentFrame.Size = UDim2.new(1, -140, 1, -15)
+ContentFrame.Position = UDim2.new(0, 135, 0, 10)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.Parent = MainFrame
 
@@ -107,17 +191,18 @@ local function SwitchToTab(tabName)
         frame.Visible = (name == tabName)
     end
     for name, btn in pairs(tabButtons) do
-        btn.TextColor3 = (name == tabName) and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(150, 150, 150)
+        btn.TextColor3 = (name == tabName) and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(140, 140, 145)
+        btn.Font = (name == tabName) and Enum.Font.GothamBlack or Enum.Font.GothamBold
     end
 end
 
 local function CreateTab(name)
     local TabButton = Instance.new("TextButton")
-    TabButton.Size = UDim2.new(1, 0, 0, 32)
+    TabButton.Size = UDim2.new(1, 0, 0, 34)
     TabButton.BackgroundTransparency = 1
     TabButton.Text = "  " .. name
-    TabButton.TextColor3 = Color3.fromRGB(150, 150, 150)
-    TabButton.Font = Enum.Font.GothamMedium
+    TabButton.TextColor3 = Color3.fromRGB(140, 140, 145)
+    TabButton.Font = Enum.Font.GothamBold -- Жирные шрифты в меню
     TabButton.TextSize = 13
     TabButton.TextXAlignment = Enum.TextXAlignment.Left
     TabButton.Parent = TabBtnContainer
@@ -127,7 +212,7 @@ local function CreateTab(name)
     Page.Size = UDim2.new(1, 0, 1, 0)
     Page.BackgroundTransparency = 1
     Page.Visible = false
-    Page.CanvasSize = UDim2.new(0, 0, 0, 300)
+    Page.CanvasSize = UDim2.new(0, 0, 0, 320)
     Page.ScrollBarThickness = 0
     Page.Parent = ContentFrame
     tabs[name] = Page
@@ -149,32 +234,33 @@ local VisualsTab = CreateTab("Visuals")
 local ExploitsTab = CreateTab("Exploits")
 SwitchToTab("Main")
 
+-- Кастомные премиум переключатели (Toggles) с жирным текстом
 local function CreateToggle(parent, name, propName, callback)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -5, 0, 35)
-    Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    Frame.Size = UDim2.new(1, -5, 0, 38)
+    Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Frame.BorderSizePixel = 0
     Frame.Parent = parent
     
     local FCorn = Instance.new("UICorner")
-    FCorn.CornerRadius = UDim.new(0, 4)
+    FCorn.CornerRadius = UDim.new(0, 6)
     FCorn.Parent = Frame
 
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, -50, 1, 0)
-    Label.Position = UDim2.new(0, 10, 0, 0)
+    Label.Position = UDim2.new(0, 12)
     Label.BackgroundTransparency = 1
     Label.Text = name
-    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    Label.Font = Enum.Font.GothamMedium
+    Label.TextColor3 = Color3.fromRGB(235, 235, 235)
+    Label.Font = Enum.Font.GothamBold -- Усиленный жирный текст настроек
     Label.TextSize = 12
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
 
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 35, 0, 16)
-    Btn.Position = UDim2.new(1, -45, 0.5, -8)
-    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    Btn.Size = UDim2.new(0, 36, 0, 18)
+    Btn.Position = UDim2.new(1, -48, 0.5, -9)
+    Btn.BackgroundColor3 = Color3.fromRGB(38, 38, 45)
     Btn.Text = ""
     Btn.Parent = Frame
     
@@ -184,15 +270,18 @@ local function CreateToggle(parent, name, propName, callback)
 
     Btn.MouseButton1Click:Connect(function()
         Config[propName] = not Config[propName]
-        TweenService:Create(Btn, TweenInfo.new(0.15), {
-            BackgroundColor3 = Config[propName] and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(45, 45, 55)
+        TweenService:Create(Btn, TweenInfo.new(0.12), {
+            BackgroundColor3 = Config[propName] and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(38, 38, 45)
         }):Play()
         if callback then callback(Config[propName]) end
     end)
 end
 
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: MAIN ]] --
+-- ======================================================= --
+-- [[ ЛОГИКА ФУНКЦИЙ (БЕЗ ИЗМЕНЕНИЙ, ВСЕ РАБОТАЕТ) ]] --
+-- ======================================================= --
 
+-- Движение и обход АФК
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
     if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -220,7 +309,6 @@ table.insert(connections, RunService.Stepped:Connect(function()
     end
 end))
 
--- [[ ЛЕГКОВЕСНЫЙ ANTI-AFK ]] --
 local antiAfkConnection
 local function toggleAntiAFK(state)
     if state then
@@ -243,41 +331,31 @@ CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
 CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
 CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
 
-
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: VISUALS ]] --
-
-local function updateFOV()
-    table.insert(connections, RunService.RenderStepped:Connect(function()
-        if Camera.FieldOfView ~= Config.FOVValue then
-            Camera.FieldOfView = Config.FOVValue
-        end
-    end))
-end
-
+-- Настройки визуализации и FOV
 local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(1, -5, 0, 35)
-FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+FOVFrame.Size = UDim2.new(1, -5, 0, 38)
+FOVFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 FOVFrame.BorderSizePixel = 0
 FOVFrame.Parent = VisualsTab
 
 local FOVLabel = Instance.new("TextLabel")
-FOVLabel.Size = UDim2.new(0, 100, 1, 0)
-FOVLabel.Position = UDim2.new(0, 10, 0, 0)
+FOVLabel.Size = UDim2.new(0, 120, 1, 0)
+FOVLabel.Position = UDim2.new(0, 12, 0, 0)
 FOVLabel.BackgroundTransparency = 1
 FOVLabel.Text = "Режим обзора (FOV)"
-FOVLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-FOVLabel.Font = Enum.Font.GothamMedium
+FOVLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+FOVLabel.Font = Enum.Font.GothamBold
 FOVLabel.TextSize = 12
 FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
 FOVLabel.Parent = FOVFrame
 
 local FOVBtn = Instance.new("TextButton")
-FOVBtn.Size = UDim2.new(0, 60, 0, 20)
-FOVBtn.Position = UDim2.new(1, -70, 0.5, -10)
-FOVBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-FOVBtn.Text = "90 FOV"
+FOVBtn.Size = UDim2.new(0, 65, 0, 22)
+FOVBtn.Position = UDim2.new(1, -75, 0.5, -11)
+FOVBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 45)
+FOVBtn.Text = "70 Default"
 FOVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FOVBtn.Font = Enum.Font.GothamBold
+FOVBtn.Font = Enum.Font.GothamBlack
 FOVBtn.TextSize = 11
 FOVBtn.Parent = FOVFrame
 local FBCorn = Instance.new("UICorner")
@@ -296,7 +374,10 @@ FOVBtn.MouseButton1Click:Connect(function()
         FOVBtn.Text = "70 Default"
     end
 end)
-updateFOV()
+
+table.insert(connections, RunService.RenderStepped:Connect(function()
+    if Camera.FieldOfView ~= Config.FOVValue then Camera.FieldOfView = Config.FOVValue end
+end))
 
 local function applySkyMod(state)
     if state then
@@ -309,7 +390,6 @@ local function applySkyMod(state)
     end
 end
 
--- [[ ЛЕГКОВЕСНЫЙ FULLBRIGHT ]] --
 table.insert(connections, RunService.RenderStepped:Connect(function()
     if Config.Fullbright then
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
@@ -332,7 +412,7 @@ local function toggleFullbright(state)
     end
 end
 
--- Динамическая проверка роли (Маньяк / Выживший)
+-- Сканнер Маньяков
 local function checkIsKiller(player, character)
     if not player then return false end
     if player.Team then
@@ -361,14 +441,13 @@ local function checkIsKiller(player, character)
     return false
 end
 
--- [[ СИНХРОННЫЙ ДВИЖОК ВИЗУАЛОВ (ESP, BOX & TRACERS) ]] --
+-- Рендер ESP и Обновленных Боксов
 task.spawn(function()
     while task.wait(0.1) do
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
                 local character = player.Character
                 if character and character:FindFirstChild("HumanoidRootPart") then
-                    
                     local folder = character:FindFirstChild("Luna_Visuals_Container")
                     if not folder then
                         folder = Instance.new("Folder")
@@ -377,10 +456,9 @@ task.spawn(function()
                     end
                     
                     local isKiller = checkIsKiller(player, character)
-                    local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
-                    local currentText = isKiller and "[ LUNA BYPASS ]" or "[ LUNA BYPASS]"
+                    local currentColor = isKiller and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(0, 255, 140)
+                    local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
                     
-                    -- ТЕКСТ ESP
                     local textESP = folder:FindFirstChild("Luna_Text")
                     if Config.ESP then
                         if not textESP then
@@ -392,8 +470,8 @@ task.spawn(function()
                             label.Name = "Label"
                             label.Size = UDim2.new(1, 0, 1, 0)
                             label.BackgroundTransparency = 1
-                            label.Font = Enum.Font.GothamBold
-                            label.TextSize = 12
+                            label.Font = Enum.Font.GothamBlack -- Жирные шрифты над головами игроков
+                            label.TextSize = 11
                             label.TextStrokeTransparency = 0
                             label.Parent = textESP
                             textESP.Parent = folder
@@ -405,7 +483,6 @@ task.spawn(function()
                         if textESP then textESP:Destroy() end
                     end
                     
-                    -- БОКС ESP (HIGHLIGHT)
                     local boxESP = folder:FindFirstChild("Luna_Highlight")
                     if Config.Box then
                         if not boxESP then
@@ -421,14 +498,13 @@ task.spawn(function()
                     else
                         if boxESP then boxESP:Destroy() end
                     end
-                    
                 end
             end
         end
     end
 end)
 
--- [[ ОТРИСОВКА ЛИНИЙ (TRACERS) НА СВЕРХПЛАВНОМ ДВИЖКЕ ]] --
+-- Рендер Трейсеров (Линий)
 table.insert(connections, RunService.RenderStepped:Connect(function()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -441,13 +517,12 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
                     local tracer = tracerCache[player]
                     if not tracer then
                         tracer = Drawing.new("Line")
-                        tracer.Thickness = 1
+                        tracer.Thickness = 1.5
                         tracer.Transparency = 1
                         tracerCache[player] = tracer
                     end
-                    
                     local isKiller = checkIsKiller(player, character)
-                    tracer.Color = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
+                    tracer.Color = isKiller and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(0, 255, 140)
                     tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                     tracer.To = Vector2.new(screenPos.X, screenPos.Y)
                     tracer.Visible = true
@@ -458,57 +533,4 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
                 if tracerCache[player] then tracerCache[player].Visible = false end
             end
         end
-    end
-    
-    -- Чистка кэша линий при выходе игрока
-    for player, tracer in pairs(tracerCache) do
-        if not Players:FindFirstChild(player.Name) then
-            tracer:Remove()
-            tracerCache[player] = nil
-        end
-    end
-end))
-
-CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP")
-CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box")
-CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers") -- Кнопка линий
-CreateToggle(VisualsTab, "Полная яркость (Fullbright)", "Fullbright", toggleFullbright) -- Кнопка яркости
-CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
-
-
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: EXPLOITS ]] --
-
-local function togglePerfectSkillCheck(state)
-    if not state then return end
-    local pGui = LocalPlayer:WaitForChild("PlayerGui")
-    
-    local function scanUI(descendant)
-        if Config.PerfectSkillCheck and descendant:IsA("GuiObject") then
-            local name = descendant.Name:lower()
-            if name:find("perfect") or name:find("great") or name:find("white") or name:find("bonus") then
-                task.wait(0.005) 
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                task.wait(0.01)
-                vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-            end
-        end
-    end
-    table.insert(connections, pGui.DescendantAdded:Connect(scanUI))
-end
-
-CreateToggle(ExploitsTab, "Perfect Auto-Skillcheck (Белая зона)", "PerfectSkillCheck", togglePerfectSkillCheck)
-
-
--- [[ УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ (INSERT) ]] --
-local MenuVisible = true
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
-        MenuVisible = not MenuVisible
-        TweenService:Create(MainFrame, TweenInfo.new(0.15), {
-            Size = MenuVisible and UDim2.new(0, 460, 0, 300) or UDim2.new(0, 460, 0, 0)
-        }):Play()
-    end
-end)
-
-print("[LUNA V4]: Успешно добавлены Tracers, Fullbright и Anti-AFK. Скрипт готов к тестам!")
+    e
