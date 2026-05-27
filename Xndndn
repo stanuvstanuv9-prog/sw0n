@@ -38,8 +38,9 @@ local success, launchError = pcall(function()
         Particles      = false,
         ParticleMode   = "Snow",
         PerfectSkillCheck = false,
-        Trails         = false, -- НОВАЯ НАСТРОЙКА
-        TrailColorValue = Color3.fromRGB(255, 255, 255) -- ЦВЕТ ШЛЕЙФА
+        Trails         = false, -- НАСТРОЙКА ШЛЕЙФА
+        TrailColorValue = Color3.fromRGB(255, 255, 255), -- ЦВЕТ ШЛЕЙФА
+        TrailMode      = "Default" -- НОВЫЙ РЕЖИМ: "Default" (Обычный) или "Worm" (Червяк)
     }
 
     local connections   = {}
@@ -69,7 +70,7 @@ local success, launchError = pcall(function()
     ScreenGui.Name = "Luna_V4"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.IgnoreGuiInset = true -- ИСПРАВЛЕНИЕ: Убирает смещение Tracers из-за верхнего бара Roblox
+    ScreenGui.IgnoreGuiInset = true 
 
     local coreOk = pcall(function() ScreenGui.Parent = CoreGui end)
     if not coreOk or not ScreenGui.Parent then
@@ -207,7 +208,7 @@ local success, launchError = pcall(function()
     local ExploitsTab = CreateTab("Exploits")
     SwitchToTab("Main")
 
-    -- ── Компоненты (с HSV Палитрой под тумблером) ───────────────────────────
+    -- ── Компоненты ───────────────────────────
 
     local function CreateToggle(parent, labelText, propName, callback, hasColor, colorPropName, colorCallback)
         local Frame = Instance.new("Frame")
@@ -391,7 +392,7 @@ local success, launchError = pcall(function()
         end
     end
 
-    -- ── Внутренняя логика Шлейфа (Trails) ───────────────────────────────────
+    -- ── Логика Шлейфа (Trails) ───────────────────────────────────
 
     local function updateLocalTrail()
         local char = LocalPlayer.Character
@@ -427,6 +428,15 @@ local success, launchError = pcall(function()
             local trail = char:FindFirstChild("LunaTrailInstance")
             if trail then
                 trail.Color = ColorSequence.new(Config.TrailColorValue)
+                
+                -- Динамическое изменение толщины и режима отображения линии
+                if Config.TrailMode == "Worm" then
+                    trail.WidthScale = NumberSequence.new(0.04) -- Сделать шлейф очень тонким («червяк»)
+                    trail.FaceCamera = true -- Поворачивать лицом к камере, чтобы линия была видна четко
+                else
+                    trail.WidthScale = NumberSequence.new(1.0) -- Обычный стандартный шлейф
+                    trail.FaceCamera = false
+                end
             end
         else
             if oldTrail then oldTrail:Destroy() end
@@ -437,7 +447,7 @@ local success, launchError = pcall(function()
         end
     end
 
-    -- ── RenderStepped / Stepped коннекты ────────────────────────────────────
+    -- ── Рендер лупы коннектов ────────────────────────────────────
 
     table.insert(connections, RunService.RenderStepped:Connect(function(dt)
         if not LocalPlayer.Character then return end
@@ -604,7 +614,7 @@ local success, launchError = pcall(function()
         return false
     end
 
-    -- ── ESP Billboard (С исправлениями рамок и линий) ───────────────────────
+    -- ── ESP Billboard ───────────────────────
 
     local function getOrCreateBillboard(character, color, labelText)
         local folder = character:FindFirstChild("Luna_Visuals_Container")
@@ -646,7 +656,6 @@ local success, launchError = pcall(function()
             if bb then bb:Destroy() end
         end
 
-        -- ИСПРАВЛЕНИЕ: Замена старого кривого SelectionBox на красивый современный Highlight
         local hl = folder:FindFirstChild("LunaHighlight")
         if Config.Box then
             if not hl then
@@ -658,7 +667,7 @@ local success, launchError = pcall(function()
                 hl.Parent = folder
             end
             hl.FillColor = color
-            hl.OutlineColor = Color3.new(1, 1, 1) -- Белый аккуратный контур
+            hl.OutlineColor = Color3.new(1, 1, 1)
         else
             if hl then hl:Destroy() end
         end
@@ -792,7 +801,7 @@ local success, launchError = pcall(function()
     task.spawn(function()
         while task.wait(0.5) do
             UpdateParticles()
-            pcall(updateLocalTrail) -- Постоянное обновление следа за спиной
+            pcall(updateLocalTrail) 
         end
     end)
 
@@ -833,7 +842,7 @@ local success, launchError = pcall(function()
     -- ── Visuals Tab ─────────────────────────────────────────────────────────
 
     CreateToggle(VisualsTab, "ESP (Имена игроков)", "ESP")
-    CreateToggle(VisualsTab, "ESP Подсветка (Chams)", "Box") -- Изменено со старого Box на красивую обводку
+    CreateToggle(VisualsTab, "ESP Подсветка (Chams)", "Box") 
     CreateToggle(VisualsTab, "Tracers (Линии к игрокам)", "Tracers")
     CreateToggle(VisualsTab, "Fullbright (Яркость)", "Fullbright", toggleFullbright)
     
@@ -844,6 +853,55 @@ local success, launchError = pcall(function()
         Config.TrailColorValue = col
         pcall(updateLocalTrail)
     end)
+
+    -- БЛОК ВЫБОРА РЕЖИМА ШЛЕЙФА (Обычный / Червяк)
+    do
+        local TModeFrame = Instance.new("Frame")
+        TModeFrame.Size = UDim2.new(1, -5, 0, 35)
+        TModeFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+        TModeFrame.BorderSizePixel = 0
+        TModeFrame.Parent = VisualsTab
+
+        local TModeCorn = Instance.new("UICorner")
+        TModeCorn.CornerRadius = UDim.new(0, 4)
+        TModeCorn.Parent = TModeFrame
+
+        local TModeLabel = Instance.new("TextLabel")
+        TModeLabel.Size = UDim2.new(0, 160, 1, 0)
+        TModeLabel.Position = UDim2.new(0, 10, 0, 0)
+        TModeLabel.BackgroundTransparency = 1
+        TModeLabel.Text = "Режим линии (шлейфа)"
+        TModeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        TModeLabel.Font = Enum.Font.GothamMedium
+        TModeLabel.TextSize = 12
+        TModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TModeLabel.Parent = TModeFrame
+
+        local TModeBtn = Instance.new("TextButton")
+        TModeBtn.Size = UDim2.new(0, 75, 0, 20)
+        TModeBtn.Position = UDim2.new(1, -83, 0.5, -10)
+        TModeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        TModeBtn.Text = "Обычный"
+        TModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        TModeBtn.Font = Enum.Font.GothamBold
+        TModeBtn.TextSize = 11
+        TModeBtn.Parent = TModeFrame
+
+        local TModeBCorn = Instance.new("UICorner")
+        TModeBCorn.CornerRadius = UDim.new(0, 4)
+        TModeBCorn.Parent = TModeBtn
+
+        TModeBtn.MouseButton1Click:Connect(function()
+            if Config.TrailMode == "Default" then
+                Config.TrailMode = "Worm"
+                TModeBtn.Text = "Червяк"
+            else
+                Config.TrailMode = "Default"
+                TModeBtn.Text = "Обычный"
+            end
+            pcall(updateLocalTrail)
+        end)
+    end
 
     CreateToggle(VisualsTab, "Цвет стен", "WallColor", applyWallMod,
         true, "WallColorValue", function(col)
@@ -946,6 +1004,7 @@ local success, launchError = pcall(function()
         FBCorn.CornerRadius = UDim.new(0, 4)
         FBCorn.Parent = FOVBtn
 
+        
         FOVBtn.MouseButton1Click:Connect(function()
             if Config.FOVValue == 70 then
                 Config.FOVValue = 95
@@ -1001,7 +1060,7 @@ local success, launchError = pcall(function()
                 local n = obj.Name:lower()
                 if (n:find("generator") or n:find("gen")) and obj:IsA("BasePart") then
                     local dist = (obj.Position - hrp.Position).Magnitude
-                            if dist < closestDist then
+                    if dist < closestDist then
                         closestDist = dist
                         closest = obj
                     end
@@ -1013,7 +1072,7 @@ local success, launchError = pcall(function()
         end)
     end
 
-    -- КНОПКА: ТП к воротам (НОВАЯ ФУНКЦИЯ)
+    -- КНОПКА: ТП к воротам
     do
         local GateFrame = Instance.new("Frame")
         GateFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -1048,7 +1107,6 @@ local success, launchError = pcall(function()
             local closest, closestDist = nil, math.huge
             for _, obj in ipairs(Workspace:GetDescendants()) do
                 local n = obj.Name:lower()
-                -- Ищет любые парты, содержащие в названии gate, door, exit, escape
                 if (n:find("gate") or n:find("door") or n:find("exit") or n:find("escape")) and obj:IsA("BasePart") then
                     local dist = (obj.Position - hrp.Position).Magnitude
                     if dist < closestDist then
@@ -1075,4 +1133,4 @@ end)
 
 if not success then
     warn("[Luna V4] Ошибка запуска: " .. tostring(launchError))
-end            
+end
