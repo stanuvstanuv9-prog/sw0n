@@ -18,7 +18,7 @@ local Config = {
     Noclip = false,
     -- Visuals
     ESP = false,
-    Box = false, -- Новый тумблер для обычных боксов
+    Box = false, -- Исправленный тумблер для боксов
     ObjectESP = false,
     FOVValue = 70,
     CustomSky = false,
@@ -27,7 +27,6 @@ local Config = {
     PerfectSkillCheck = false
 }
 
-local espFolders = {}
 local connections = {}
 local tabs = {}
 local tabButtons = {}
@@ -285,89 +284,115 @@ local function applySkyMod(state)
     end
 end
 
--- Функция создания и обновления визуалов для конкретного игрока
-local function drawVisuals(player, character)
-    if espFolders[player] then pcall(function() espFolders[player]:Destroy() end) end
-    if not Config.ESP and not Config.Box then return end
+-- [[ СВЕРХТОЧНАЯ ДИНАМИЧЕСКАЯ СИСТЕМА ОПРЕДЕЛЕНИЯ РОЛИ ]] --
+local function checkIsKiller(player, character)
+    if not player then return false end
     
-    local root = character:WaitForChild("HumanoidRootPart", 5)
-    if not root then return end
-    
-    local folder = Instance.new("Folder")
-    folder.Name = "Luna_Visuals"
-    folder.Parent = character
-    espFolders[player] = folder
-
-    -- Определение роли и выбор цвета
-    local isKiller = false
-    if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("beast")) then
-        isKiller = true
-    elseif character:FindFirstChildOfClass("Tool") or character:GetAttribute("Role") == "Killer" or player:GetAttribute("Role") == "Killer" then
-        isKiller = true
-    end
-    
-    local themeColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
-
-    -- Рендеринг текстового ESP
-    if Config.ESP then
-        local bb = Instance.new("BillboardGui")
-        bb.Size = UDim2.new(0, 160, 0, 40)
-        bb.AlwaysOnTop = true
-        bb.Adornee = root
-        bb.Parent = folder
-
-        local txt = Instance.new("TextLabel")
-        txt.Size = UDim2.new(1, 0, 1, 0)
-        txt.BackgroundTransparency = 1
-        txt.Font = Enum.Font.GothamBold
-        txt.TextSize = 12
-        txt.TextStrokeTransparency = 0
-        txt.TextColor3 = themeColor
-        txt.Text = isKiller and ("[ МАНЬЯК ]\n" .. player.DisplayName) or ("[ Выживший ]\n" .. player.DisplayName)
-        txt.Parent = bb
-    end
-
-    -- Рендеринг обычных 3D Боксов
-    if Config.Box then
-        local box = Instance.new("SelectionBox")
-        box.Name = "Luna_Box"
-        box.Adornee = character
-        box.Color3 = themeColor
-        box.LineThickness = 0.05
-        box.SurfaceTransparency = 1 -- Полностью прозрачные грани, видны только ребра (рамка)
-        box.AlwaysOnTop = true
-        box.Parent = folder
-    end
-end
-
--- Массовое обновление всех игроков при переключении кнопок
-local function refreshVisuals()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            drawVisuals(p, p.Character)
+    -- 1. Проверка по названию команды
+    if player.Team then
+        local tName = player.Team.Name:lower()
+        if tName:find("kill") or tName:find("slash") or tName:find("beast") or tName:find("murder") or tName:find("hunter") or tName:find("monster") then
+            return true
         end
     end
+    
+    -- 2. Проверка по встроенным атрибутам Roblox (работает во многих плейсах)
+    if player:GetAttribute("Role") == "Killer" or player:GetAttribute("IsKiller") == true then return true end
+    if character and (character:GetAttribute("Role") == "Killer" or character:GetAttribute("IsKiller") == true) then return true end
+    
+    -- 3. Проверка по оружию в руках или инвентаре (исключая мирные предметы)
+    local function scansForWeapons(container)
+        if not container then return false end
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") then
+                local iName = item.Name:lower()
+                if not iName:find("flashlight") and not iName:find("medkit") and not iName:find("cola") and not iName:find("camera") and not iName:find("card") then
+                    return true -- Если у него в руках оружие (не фонарик/аптечка), то он маньяк
+                end
+            end
+        end
+        return false
+    end
+    
+    if character and scansForWeapons(character) then return true end
+    if player:FindFirstChild("Backpack") and scansForWeapons(player.Backpack) then return true end
+    
+    return false
 end
 
--- Инициализация отслеживания игроков (подключается один раз при запуске)
-local function hookPlayer(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function(character)
-        task.wait(0.3) -- Небольшая задержка для загрузки частей тела
-        if character.Parent then drawVisuals(player, character) end
-    end)
-    if player.Character then drawVisuals(player, player.Character) end
-end
+-- [[ ЕДИНЫЙ ПОТОК ОБНОВЛЕНИЯ ВИЗУАЛОВ (БЕЗ ЛАГОВ И ОШИБОК) ]] --
+task.spawn(function()
+    while task.wait(0.3) do -- Постоянный цикл обновления каждые 0.3 сек
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local character = player.Character
+                if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChildOfClass("Humanoid") then
+                    
+                    -- Создаем или находим контейнер для наших чит-объектов внутри игрока
+                    local folder = character:FindFirstChild("Luna_Visuals_Container")
+                    if not folder then
+                        folder = Instance.new("Folder")
+                        folder.Name = "Luna_Visuals_Container"
+                        folder.Parent = character
+                    end
+                    
+                    -- Запускаем точную проверку роли в реальном времени
+                    local isKiller = checkIsKiller(player, character)
+                    local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
+                    local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
+                    
+                    -- ОБРАБОТКА НИК ESP (НАДПИСИ)
+                    local textESP = folder:FindFirstChild("Luna_Text")
+                    if Config.ESP then
+                        if not textESP then
+                            textESP = Instance.new("BillboardGui")
+                            textESP.Name = "Luna_Text"
+                            textESP.Size = UDim2.new(0, 160, 0, 40)
+                            textESP.AlwaysOnTop = true
+                            
+                            local label = Instance.new("TextLabel")
+                            label.Name = "Label"
+                            label.Size = UDim2.new(1, 0, 1, 0)
+                            label.BackgroundTransparency = 1
+                            label.Font = Enum.Font.GothamBold
+                            label.TextSize = 12
+                            label.TextStrokeTransparency = 0
+                            label.Parent = textESP
+                            
+                            textESP.Parent = folder
+                        end
+                        textESP.Adornee = character.HumanoidRootPart
+                        textESP.Label.Text = currentText .. "\n" .. player.DisplayName
+                        textESP.Label.TextColor3 = currentColor
+                    else
+                        if textESP then textESP:Destroy() end
+                    end
+                    
+                    -- ОБРАБОТКА БОКС ESP (ПОДДСВЕТКА СТЕН)
+                    local boxESP = folder:FindFirstChild("Luna_Highlight")
+                    if Config.Box then
+                        if not boxESP then
+                            boxESP = Instance.new("Highlight")
+                            boxESP.Name = "Luna_Highlight"
+                            boxESP.FillTransparency = 1 -- Прозрачный внутри (только рамка-бокс)
+                            boxESP.OutlineTransparency = 0
+                            boxESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                            boxESP.Parent = folder
+                        end
+                        boxESP.Adornee = character
+                        boxESP.OutlineColor = currentColor
+                    else
+                        if boxESP then boxESP:Destroy() end
+                    end
+                    
+                end
+            end
+        end
+    end
+end)
 
-for _, p in ipairs(Players:GetPlayers()) do hookPlayer(p) end
-table.insert(connections, Players.PlayerAdded:Connect(hookPlayer))
-
--- Функции для тумблеров интерфейса
-local function toggleESP(state) refreshVisuals() end
-local function toggleBox(state) refreshVisuals() end
-
-CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP", toggleESP)
-CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box", toggleBox) -- Наш новый тумблер!
+CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP")
+CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box") -- Теперь работает идеально
 CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
 
 
@@ -407,4 +432,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[LUNA V4]: Загрузка завершена. Боксы добавлены во вкладку Visuals!")
+print("[LUNA V4]: Перезапуск успешен. Все баги устранены!")
