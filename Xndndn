@@ -36,7 +36,7 @@ local success, launchError = pcall(function()
         SkyColor       = false,
         SkyColorValue  = Color3.fromRGB(0, 180, 255),
         Particles      = false,
-        ParticleMode   = "Snow",
+        ParticleMode   = "Rain", -- Изменено со "Snow" на "Rain" по умолчанию
         PerfectSkillCheck = false
     }
 
@@ -204,14 +204,14 @@ local success, launchError = pcall(function()
     local ExploitsTab = CreateTab("Exploits")
     SwitchToTab("Main")
 
-    -- ── Компоненты (с HSV Палитрой под тумблером) ───────────────────────────
+    -- ── Компоненты ──────────────────────────────────────────────────────────
 
     local function CreateToggle(parent, labelText, propName, callback, hasColor, colorPropName, colorCallback)
         local Frame = Instance.new("Frame")
         Frame.Size = UDim2.new(1, -5, 0, 35)
         Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
         Frame.BorderSizePixel = 0
-        Frame.ClipsDescendants = true -- Чтобы скрывать палитру при закрытии
+        Frame.ClipsDescendants = true
         Frame.Parent = parent
 
         local FCorn = Instance.new("UICorner")
@@ -494,7 +494,7 @@ local success, launchError = pcall(function()
         if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
             isSprinting = false
             if LocalPlayer.Character then
-                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+              local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if hum and not Config.CFrameSpeed and hum.WalkSpeed == Config.SprintWalkSpeed then
                     hum.WalkSpeed = Config.NormalWalkSpeed
                 end
@@ -719,7 +719,6 @@ local success, launchError = pcall(function()
             end
             local pe = existing:FindFirstChild("WeatherEmitter")
             if pe then
-                -- Используем 100% рабочую текстуру круга от роблокса (без закорючек)
                 pe.Texture = "rbxassetid://281982705" 
                 if Config.ParticleMode == "Snow" then
                     pe.Rate = 250
@@ -832,7 +831,7 @@ local success, launchError = pcall(function()
         WBtn.Size = UDim2.new(0, 75, 0, 20)
         WBtn.Position = UDim2.new(1, -83, 0.5, -10)
         WBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        WBtn.Text = "Снег"
+        WBtn.Text = "Дождь" -- Установлено по умолчанию
         WBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         WBtn.Font = Enum.Font.GothamBold
         WBtn.TextSize = 11
@@ -957,9 +956,10 @@ local success, launchError = pcall(function()
         end)
     end
 
+    -- Обработчик скрытия/открытия интерфейса на Insert
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
-        if input.KeyCode == Enum.KeyCode.RightControl then
+        if input.KeyCode == Enum.KeyCode.Insert then -- Кнопка успешно переназначена на Insert
             MainFrame.Visible = not MainFrame.Visible
         end
     end)
@@ -968,4 +968,4 @@ end)
 
 if not success then
     warn("[Luna V4] Ошибка запуска: " .. tostring(launchError))
-end
+end  
