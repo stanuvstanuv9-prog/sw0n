@@ -1,4 +1,4 @@
--- [[ LUNA Premium V2 - Violence District ]] --
+-- [[ LUNA V3 - Anti-Bug Edition ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -7,279 +7,300 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 
--- Настройки функций
 local Config = { 
     Noclip = false, 
     ESP = false, 
     AutoSkillCheck = false,
     Speedhack = false,
-    SpeedValue = 24, -- Стандартная скорость около 16
+    SpeedValue = 22,
     NoFall = false,
     ObjectESP = false
 }
 
-local espObjects = {}
-local objectEspList = {}
+local espFolders = {}
 local connections = {}
 
--- [[ GUI ИНТЕРФЕЙС (Смещен ниже центра, без лишних полос) ]] --
+-- [[ GUI БЕЗ БАГАННЫХ ПОЛОС (Полностью удален UIStroke) ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Luna_V2"
+ScreenGui.Name = "Luna_V3"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 360, 0, 340)
--- Сместили позицию по Y на 0.55 (ниже центра экрана)
-MainFrame.Position = UDim2.new(0.5, -180, 0.55, -170)
-MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+MainFrame.Size = UDim2.new(0, 340, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -170, 0.6, -160) -- Смещено еще ниже
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.CornerRadius = UDim.new(0, 6)
 UICorner.Parent = MainFrame
 
--- Мягкая, тонкая обводка (не бьет по глазам по центру экрана)
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 1
-UIStroke.Color = Color3.fromRGB(0, 120, 255)
-UIStroke.Transparency = 0.3
-UIStroke.Parent = MainFrame
+-- Вместо UIStroke используем плоскую рамку-заголовок, она никогда не забагуется полосой
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 35)
+Header.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-Title.Text = "  LUNA V2 | Violence District"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "LUNA V3 | Violence District"
+Title.TextColor3 = Color3.fromRGB(0, 180, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = MainFrame
+Title.Parent = Header
 
 local Container = Instance.new("ScrollingFrame")
-Container.Size = UDim2.new(1, -20, 1, -50)
-Container.Position = UDim2.new(0, 10, 0, 45)
+Container.Size = UDim2.new(1, -20, 1, -45)
+Container.Position = UDim2.new(0, 10, 0, 40)
 Container.BackgroundTransparency = 1
-Container.CanvasSize = UDim2.new(0, 0, 0, 420) -- Скролл для новых функций
-Container.ScrollBarThickness = 2
-Container.ScrollBarImageColor3 = Color3.fromRGB(0, 120, 255)
+Container.CanvasSize = UDim2.new(0, 0, 0, 360)
+Container.ScrollBarThickness = 0 -- Скрыли полосу прокрутки
 Container.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Padding = UDim.new(0, 6)
 UIListLayout.Parent = Container
 
--- Функция создания кнопок
 local function CreateToggle(name, propName, callback)
     local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, -5, 0, 40)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+    ToggleFrame.Size = UDim2.new(1, 0, 0, 38)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     ToggleFrame.BorderSizePixel = 0
     ToggleFrame.Parent = Container
     
     local TFCorner = Instance.new("UICorner")
-    TFCorner.CornerRadius = UDim.new(0, 5)
+    TFCorner.CornerRadius = UDim.new(0, 4)
     TFCorner.Parent = ToggleFrame
 
     local TextLabel = Instance.new("TextLabel")
     TextLabel.Size = UDim2.new(1, -60, 1, 0)
-    TextLabel.Position = UDim2.new(0, 12, 0, 0)
+    TextLabel.Position = UDim2.new(0, 10, 0, 0)
     TextLabel.BackgroundTransparency = 1
     TextLabel.Text = name
-    TextLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
     TextLabel.Font = Enum.Font.GothamMedium
-    TextLabel.TextSize = 13
+    TextLabel.TextSize = 12
     TextLabel.TextXAlignment = Enum.TextXAlignment.Left
     TextLabel.Parent = ToggleFrame
 
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(0, 40, 0, 20)
-    Button.Position = UDim2.new(1, -50, 0.5, -10)
-    Button.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    Button.Size = UDim2.new(0, 35, 0, 18)
+    Button.Position = UDim2.new(1, -45, 0.5, -9)
+    Button.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     Button.Text = ""
     Button.Parent = ToggleFrame
     
     local BCorner = Instance.new("UICorner")
     BCorner.CornerRadius = UDim.new(1, 0)
     BCorner.Parent = Button
-    
-    local Circle = Instance.new("Frame")
-    Circle.Size = UDim2.new(0, 14, 0, 14)
-    Circle.Position = UDim2.new(0, 3, 0.5, -7)
-    Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Circle.Parent = Button
-    local CCorner = Instance.new("UICorner")
-    CCorner.CornerRadius = UDim.new(1, 0)
-    CCorner.Parent = Circle
 
     Button.MouseButton1Click:Connect(function()
         Config[propName] = not Config[propName]
         local enabled = Config[propName]
         
-        TweenService:Create(Button, TweenInfo.new(0.2), {
-            BackgroundColor3 = enabled and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(35, 35, 45)
-        }):Play()
-        
-        TweenService:Create(Circle, TweenInfo.new(0.2), {
-            Position = enabled and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+        TweenService:Create(Button, TweenInfo.new(0.15), {
+            BackgroundColor3 = enabled and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(50, 50, 60)
         }):Play()
         
         if callback then callback(enabled) end
     end)
 end
 
--- [[ ИСПРАВЛЕННАЯ ЛОГИКА ЧИТОВ ]] --
-
--- 1. Улучшенный ESP (Проверка ролей)
-local function applyESP(player)
+-- [[ АБСОЛЮТНО НОВЫЙ ESP (Через Текстовые Свечения — БЕЗ багов с Highlight) ]] --
+local function createBillboardESP(player)
     if player == LocalPlayer then return end
     
-    local function characterAdded(character)
-        if not Config.ESP then return end
-        task.wait(0.5)
-        if espObjects[player] then espObjects[player]:Destroy() end
-        
-        local highlight = Instance.new("Highlight")
-        highlight.Parent = character
-        highlight.Adornee = character
-        highlight.FillOpacity = 0.25
-        highlight.OutlineOpacity = 1
-        
-        -- Умная проверка на Убийцу
-        local isKiller = false
-        if player.Team and (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("slasher") or player.Team.Name:lower():find("murder") or player.Team.Name:lower():find("beast")) then
-            isKiller = true
-        elseif character:UrgentWaitForChild("Weapon", 2) or character:FindFirstChild("Knife") or character:SetAttribute("Role") == "Killer" then
-            -- Дополнительная проверка на наличие оружия в руках персонажа
-            isKiller = true
+    local function removeOldEsp()
+        if espFolders[player] then
+            pcall(function() espFolders[player]:Destroy() end)
+            espFolders[player] = nil
         end
-        
-        if isKiller then
-            highlight.FillColor = Color3.fromRGB(255, 0, 50) -- Настоящий убийца КРАСНЫЙ
-            highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
-        else
-            highlight.FillColor = Color3.fromRGB(0, 180, 255) -- Выжившие СИНИЙ/ГОЛУБОЙ
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        end
-        espObjects[player] = highlight
     end
-    
-    player.CharacterAdded:Connect(characterAdded)
-    if player.Character then characterAdded(player.Character) end
+
+    local function onChar(character)
+        removeOldEsp()
+        if not Config.ESP then return end
+        
+        local root = character:WaitForChild("HumanoidRootPart", 5)
+        if not root then return end
+        
+        local folder = Instance.new("Folder")
+        folder.Name = "Luna_PlayerESP"
+        folder.Parent = character
+        espFolders[player] = folder
+
+        -- Текстовый оверхед (Ник + Роль)
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0, 200, 0, 50)
+        bb.AlwaysOnTop = true
+        bb.ExtentsOffset = Vector3.new(0, 3, 0)
+        bb.Adornee = root
+        bb.Parent = folder
+
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Font = Enum.Font.GothamBold
+        txt.TextSize = 13
+        txt.TextStrokeTransparency = 0
+        txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        txt.Parent = bb
+
+        -- Жесткая проверка на Маньяка (Killer)
+        local isKiller = false
+        
+        -- 1. Проверка по названию команды
+        if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("murder") or player.Team.Name:lower():find("beast")) then
+            isKiller = true
+        -- 2. Проверка по инструментам/оружию
+        elseif character:FindFirstChildOfClass("Tool") or player:WaitForChild("Backpack", 1):FindFirstChildOfClass("Tool") then
+            isKiller = true
+        -- 3. Проверка по кастомным атрибутам Violence District
+        elseif character:GetAttribute("Role") == "Killer" or character:GetAttribute("IsKiller") == true then
+            isKiller = true
+        end
+
+        if isKiller then
+            txt.Text = "[ МАНЬЯК ]\n" .. player.DisplayName
+            txt.TextColor3 = Color3.fromRGB(255, 0, 0) -- Ярко-красный
+            
+            -- Бокс подсветки для маньяка
+            local box = Instance.new("BoxHandleAdornment")
+            box.Size = Vector3.new(4, 6, 4)
+            box.Color3 = Color3.fromRGB(255, 0, 0)
+            box.AlwaysOnTop = true
+            box.ZIndex = 6
+            box.Adornee = root
+            box.Transparency = 0.5
+            box.Parent = folder
+        else
+            txt.Text = "[ Выживший ]\n" .. player.DisplayName
+            txt.TextColor3 = Color3.fromRGB(0, 255, 150) -- Зеленый
+        end
+    end
+
+    player.CharacterAdded:Connect(onChar)
+    if player.Character then onChar(player.Character) end
 end
 
 local function toggleESP(state)
     if state then
-        for _, p in ipairs(Players:GetPlayers()) do applyESP(p) end
-        table.insert(connections, Players.PlayerAdded:Connect(applyESP))
+        for _, p in ipairs(Players:GetPlayers()) do createBillboardESP(p) end
+        table.insert(connections, Players.PlayerAdded:Connect(createBillboardESP))
     else
-        for p, h in pairs(espObjects) do if h then h:Destroy() end end
-        table.clear(espObjects)
+        for _, folder in pairs(espFolders) do pcall(function() folder:Destroy() end) end
+        table.clear(espFolders)
     end
 end
 
--- 2. ESP на Генераторы и Палеты (Объекты)
+-- [[ НОВЫЙ ESP НА ОБЪЕКТЫ (Генераторы / Палеты) ]] --
 local function toggleObjectESP(state)
     if state then
         table.insert(connections, RunService.Heartbeat:Connect(function()
             if not Config.ObjectESP then return end
-            -- Сканируем карту на наличие важных объектов
             for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("Model") and (obj.Name:lower():find("generator") or obj.Name:lower():find("pallet") or obj.Name:lower():find("engine")) then
-                    if not obj:FindFirstChild("Luna_ObjESP") then
-                        local box = Instance.new("BoxHandleAdornment")
-                        box.Name = "Luna_ObjESP"
-                        box.Size = obj:GetExtentsSize() + Vector3.new(0.1, 0.1, 0.1)
-                        box.Color3 = obj.Name:lower():find("generator") and Color3.fromRGB(240, 200, 0) or Color3.fromRGB(150, 75, 0) -- Желтый для генераторов, коричневый для палет
-                        box.AlwaysOnTop = true
-                        box.ZIndex = 5
-                        box.Adornee = obj
-                        box.Transparency = 0.6
-                        box.Parent = obj
-                        table.insert(objectEspList, box)
+                if obj:IsA("Model") and not obj:FindFirstChild("LunaObj") then
+                    local name = obj.Name:lower()
+                    local isGen = name:find("gen") or name:find("motor") or name:find("engine")
+                    local isPallet = name:find("pallet") or name:find("plate") or name:find("board")
+                    
+                    if isGen or isPallet then
+                        local folder = Instance.new("Folder")
+                        folder.Name = "LunaObj"
+                        folder.Parent = obj
+                        
+                        local bb = Instance.new("BillboardGui")
+                        bb.Size = UDim2.new(0, 150, 0, 30)
+                        bb.AlwaysOnTop = true
+                        bb.Adornee = obj:FindFirstChildOfClass("BasePart") or obj
+                        bb.Parent = folder
+                        
+                        local txt = Instance.new("TextLabel")
+                        txt.Size = UDim2.new(1, 0, 1, 0)
+                        txt.BackgroundTransparency = 1
+                        txt.Font = Enum.Font.GothamBold
+                        txt.TextSize = 11
+                        txt.TextStrokeTransparency = 0
+                        txt.Text = isGen and "[ ГЕНЕРАТОР ]" or "[ ПАЛЕТА ]"
+                        txt.TextColor3 = isGen and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(160, 120, 90)
+                        txt.Parent = bb
                     end
                 end
             end
         end))
     else
-        for _, v in ipairs(objectEspList) do pcall(function() v:Destroy() end) end
-        table.clear(objectEspList)
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            local f = obj:FindFirstChild("LunaObj")
+            if f then pcall(function() f:Destroy() end) end
+        end
     end
 end
 
--- 3. Продвинутый Авто-Скиллчек
+-- [[ АВТО-СКИЛЛЧЕК (Поиск по всем GUI игры) ]] --
 local function toggleSkillCheck(state)
     if not state then return end
-    local playerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
+    local pGui = LocalPlayer:WaitForChild("PlayerGui")
     
-    local function checkUI(descendant)
-        if Config.AutoSkillCheck then
-            -- Проверяем UI элементы на маркеры зон успеха скиллчека
-            if descendant:IsA("Frame") or descendant:IsA("ImageLabel") then
-                if descendant.Name:lower():find("success") or descendant.Name:lower():find("perfect") or descendant.Name:lower():find("zone") then
-                    task.wait(0.02) -- Моментальный прок
-                    local vim = game:GetService("VirtualInputManager")
-                    vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                    task.wait(0.01)
-                    vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-                end
+    local function scan(descendant)
+        if Config.AutoSkillCheck and descendant:IsA("GuiObject") then
+            local n = descendant.Name:lower()
+            -- Проверяем вообще все возможные триггеры зоны успеха в разных плейсах
+            if n:find("zone") or n:find("success") or n:find("perfect") or n:find("check") or n:find("bar") then
+                task.wait(0.01)
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                task.wait(0.01)
+                vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
             end
         end
     end
-    
-    table.insert(connections, playerGui.DescendantAdded:Connect(checkUI))
+    table.insert(connections, pGui.DescendantAdded:Connect(scan))
 end
 
--- 4. Спидхак и NoFall
+-- [[ ОСТАЛЬНЫЕ ФУНКЦИИ ]] --
 table.insert(connections, RunService.RenderStepped:Connect(function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local hum = LocalPlayer.Character.Humanoid
-        -- Спидхак
-        if Config.Speedhack then
-            hum.WalkSpeed = Config.SpeedValue
-        end
-        -- NoFall (Отключаем падение и урон штатным способом)
-        if Config.NoFall then
-            if hum:GetState() == Enum.HumanoidStateType.Freefall then
-                hum:ChangeState(Enum.HumanoidStateType.Running)
-            end
+        if Config.Speedhack then hum.WalkSpeed = Config.SpeedValue end
+        if Config.NoFall and hum:GetState() == Enum.HumanoidStateType.Freefall then
+            hum:ChangeState(Enum.HumanoidStateType.Running)
         end
     end
 end))
 
--- 5. Noclip
 table.insert(connections, RunService.Stepped:Connect(function()
     if Config.Noclip and LocalPlayer.Character then
         for _, part in ipairs(LocalPlayer.Character:GetChildren()) do
-            if part:IsA("BasePart") and part.CanCollide then
-                part.CanCollide = false
-            end
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
 end))
 
--- [[ ИНИЦИАЛИЗАЦИЯ КНОПОК ]] --
-CreateToggle("Подсветка игроков (ESP)", "ESP", toggleESP)
-CreateToggle("ESP на Генераторы и Палеты", "ObjectESP", toggleObjectESP)
-CreateToggle("Авто-Скиллчек (Исправлен)", "AutoSkillCheck", toggleSkillCheck)
-CreateToggle("Проход сквозь стены (Noclip)", "Noclip")
-CreateToggle("Быстрый бег (Speedhack)", "Speedhack")
-CreateToggle("Анти-урон от падения (No Fall)", "NoFall")
+-- Кнопки
+CreateToggle("Включить ESP (Игроки/Маньяк)", "ESP", toggleESP)
+CreateToggle("Включить ESP (Генераторы/Палеты)", "ObjectESP", toggleObjectESP)
+CreateToggle("Авто-Скиллчек (Глобальный хак)", "AutoSkillCheck", toggleSkillCheck)
+CreateToggle("Noclip (Сквозь стены)", "Noclip")
+CreateToggle("Speedhack (Быстрый бег)", "Speedhack")
+CreateToggle("No Fall (Анти-падение)", "NoFall")
 
--- [[ СВЕРНУТЬ НА INSERT ]] --
+-- Insert
 local MenuVisible = true
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
         MenuVisible = not MenuVisible
-        TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-            Size = MenuVisible and UDim2.new(0, 360, 0, 340) or UDim2.new(0, 360, 0, 0)
+        TweenService:Create(MainFrame, TweenInfo.new(0.15), {
+            Size = MenuVisible and UDim2.new(0, 340, 0, 320) or UDim2.new(0, 340, 0, 0)
         }):Play()
     end
 end)
-
-print("[LUNA V2]: Обновление успешно применено.")
