@@ -1,4 +1,4 @@
--- [[ LUNA V4 - Multi-Tab Premium Edition ]] --
+-- [[ LUNA V4 - Multi-Tab Premium Edition (FIXED BOOT) ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -9,14 +9,17 @@ local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 
--- Глобальный конфиг софта
+-- Проверка поддержки Drawing API эксплойтом
+local hasDrawing = pcall(function()
+    local t = Drawing.new("Line")
+    t:Destroy()
+end)
+
 local Config = {
-    -- Main
     CFrameSpeed = false,
     SpeedValue = 2.5,
     NoFall = false,
     Noclip = false,
-    -- Visuals
     ESP = false,
     BoxESP = false,
     CornerESP = false,
@@ -25,29 +28,30 @@ local Config = {
     FOVValue = 70,
     CustomSky = false,
     SkyColor = Color3.fromRGB(120, 100, 255),
-    -- Exploits
     PerfectSkillCheck = false,
     RemoteRepair = false
 }
 
 local espFolders = {}
-local drawingVisuals = {} -- Хранилище элементов Drawing API
+local drawingVisuals = {}
 local connections = {}
 local tabs = {}
 local tabButtons = {}
-local lockedGenerator = nil -- Для функции Remote Repair
+local lockedGenerator = nil
 
--- [[ СОЗДАНИЕ ИНТЕРФЕЙСА С ВКЛАДКАМИ ]] --
+-- [[ БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Luna_V4"
+ScreenGui.Name = "Luna_V4_Protected"
 ScreenGui.ResetOnSpawn = false
-pcall(function() ScreenGui.Parent = CoreGui end)
-if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Пробуем засунуть в PlayerGui (это обходит блокировку CoreGui во многих играх)
+local targetParent = LocalPlayer:WaitForChild("PlayerGui", 10) or CoreGui
+ScreenGui.Parent = targetParent
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 460, 0, 320) -- Немного увеличили высоту под новые тумблеры
-MainFrame.Position = UDim2.new(0.5, -230, 0.55, -150)
+MainFrame.Size = UDim2.new(0, 460, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -57,6 +61,7 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
+-- [[ ДАЛЬШЕ ИДЕТ СТАНДАРТНАЯ СБОРКА ИНТЕРФЕЙСА LUNA ]] --
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 120, 1, 0)
 Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
@@ -94,9 +99,7 @@ ContentFrame.BackgroundTransparency = 1
 ContentFrame.Parent = MainFrame
 
 local function SwitchToTab(tabName)
-    for name, frame in pairs(tabs) do
-        frame.Visible = (name == tabName)
-    end
+    for name, frame in pairs(tabs) do frame.Visible = (name == tabName) end
     for name, btn in pairs(tabButtons) do
         btn.TextColor3 = (name == tabName) and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(150, 150, 150)
     end
@@ -118,7 +121,7 @@ local function CreateTab(name)
     Page.Size = UDim2.new(1, 0, 1, 0)
     Page.BackgroundTransparency = 1
     Page.Visible = false
-    Page.CanvasSize = UDim2.new(0, 0, 0, 380) -- Увеличили прокрутку для Visuals
+    Page.CanvasSize = UDim2.new(0, 0, 0, 380)
     Page.ScrollBarThickness = 0
     Page.Parent = ContentFrame
     tabs[name] = Page
@@ -128,10 +131,7 @@ local function CreateTab(name)
     PageLayout.Padding = UDim.new(0, 6)
     PageLayout.Parent = Page
 
-    TabButton.MouseButton1Click:Connect(function()
-        SwitchToTab(name)
-    end)
-
+    TabButton.MouseButton1Click:Connect(function() SwitchToTab(name) end)
     return Page
 end
 
@@ -182,7 +182,7 @@ local function CreateToggle(parent, name, propName, callback)
     end)
 end
 
--- [[ REALIZATION: MAIN ]] --
+-- [[ ЛОГИКА ФУНКЦИЙ ]] --
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
     if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -214,10 +214,9 @@ CreateToggle(MainTab, "Кастомный Speedhack (CFrame)", "CFrameSpeed")
 CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
 CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
 
-
--- [[ REALIZATION: DRAWING ESP (BOX, CORNER, TRACERS) ]] --
+-- Инициализация Drawing ESP с проверкой на поддержку читом
 local function CreateDrawingESP(player)
-    if player == LocalPlayer then return end
+    if player == LocalPlayer or not hasDrawing then return end
 
     local box = Drawing.new("Square")
     box.Visible = false
@@ -230,123 +229,85 @@ local function CreateDrawingESP(player)
     tracer.Color = Color3.fromRGB(255, 255, 255)
     tracer.Thickness = 1
 
-    -- Углы для Corner ESP (4 линии)
     local corners = {
         TopLeftH = Drawing.new("Line"), TopLeftV = Drawing.new("Line"),
         TopRightH = Drawing.new("Line"), TopRightV = Drawing.new("Line"),
         BotLeftH = Drawing.new("Line"), BotLeftV = Drawing.new("Line"),
         BotRightH = Drawing.new("Line"), BotRightV = Drawing.new("Line")
     }
-
-    for _, c in pairs(corners) do
-        c.Visible = false
-        c.Color = Color3.fromRGB(255, 255, 255)
-        c.Thickness = 1
-    end
+    for _, c in pairs(corners) do c.Visible = false; c.Thickness = 1 end
 
     drawingVisuals[player] = {Box = box, Tracer = tracer, Corners = corners}
 
-    local function update()
-        local connection
-        connection = RunService.RenderStepped:Connect(function()
-            if not drawingVisuals[player] then connection:Disconnect() return end
-            
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not drawingVisuals[player] then connection:Disconnect() return end
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
 
-            if char and root and hum and hum.Health > 0 then
-                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                
-                if onScreen then
-                    -- Определяем цвет (Маньяк / Выживший)
-                    local color = Color3.fromRGB(0, 255, 120)
-                    if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("beast")) or char:FindFirstChildOfClass("Tool") or char:GetAttribute("Role") == "Killer" then
-                        color = Color3.fromRGB(255, 30, 30)
-                    end
-
-                    -- Расчет размеров бокса на основании дистанции
-                    local sizeX = 1000 / pos.Z
-                    local sizeY = 1300 / pos.Z
-                    local posX = pos.X - sizeX / 2
-                    local posY = pos.Y - sizeY / 2
-
-                    -- Точка старта трейсеров (снизу экрана по центру)
-                    local screenCenterBottom = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-
-                    -- 1. Обработка Обычного Box ESP
-                    if Config.BoxESP then
-                        box.Size = Vector2.new(sizeX, sizeY)
-                        box.Position = Vector2.new(posX, posY)
-                        box.Color = color
-                        box.Visible = true
-                    else
-                        box.Visible = false
-                    end
-
-                    -- 2. Обработка Corner ESP (Угловой)
-                    if Config.CornerESP then
-                        local length = sizeX / 4
-                        corners.TopLeftH.From = Vector2.new(posX, posY)
-                        corners.TopLeftH.To = Vector2.new(posX + length, posY)
-                        corners.TopLeftV.From = Vector2.new(posX, posY)
-                        corners.TopLeftV.To = Vector2.new(posX, posY + length)
-
-                        corners.TopRightH.From = Vector2.new(posX + sizeX, posY)
-                        corners.TopRightH.To = Vector2.new(posX + sizeX - length, posY)
-                        corners.TopRightV.From = Vector2.new(posX + sizeX, posY)
-                        corners.TopRightV.To = Vector2.new(posX + sizeX, posY + length)
-
-                        corners.BotLeftH.From = Vector2.new(posX, posY + sizeY)
-                        corners.BotLeftH.To = Vector2.new(posX + length, posY + sizeY)
-                        corners.BotLeftV.From = Vector2.new(posX, posY + sizeY)
-                        corners.BotLeftV.To = Vector2.new(posX, posY + sizeY - length)
-
-                        corners.BotRightH.From = Vector2.new(posX + sizeX, posY + sizeY)
-                        corners.BotRightH.To = Vector2.new(posX + sizeX - length, posY + sizeY)
-                        corners.BotRightV.From = Vector2.new(posX + sizeX, posY + sizeY)
-                        corners.BotRightV.To = Vector2.new(posX + sizeX, posY + sizeY - length)
-
-                        for _, c in pairs(corners) do c.Color = color; c.Visible = true end
-                    else
-                        for _, c in pairs(corners) do c.Visible = false end
-                    end
-
-                    -- 3. Обработка Трейсеров (Линий)
-                    if Config.Tracers then
-                        tracer.From = screenCenterBottom
-                        tracer.To = Vector2.new(pos.X, pos.Y + (sizeY / 2))
-                        tracer.Color = color
-                        tracer.Visible = true
-                    else
-                        tracer.Visible = false
-                    end
-                else
-                    box.Visible = false
-                    tracer.Visible = false
-                    for _, c in pairs(corners) do c.Visible = false end
+        if char and root and hum and hum.Health > 0 then
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen then
+                local color = Color3.fromRGB(0, 255, 120)
+                if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash")) or char:GetAttribute("Role") == "Killer" then
+                    color = Color3.fromRGB(255, 30, 30)
                 end
+
+                local sizeX = 1000 / pos.Z
+                local sizeY = 1300 / pos.Z
+                local posX = pos.X - sizeX / 2
+                local posY = pos.Y - sizeY / 2
+                local screenCenterBottom = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+
+                if Config.BoxESP then
+                    box.Size = Vector2.new(sizeX, sizeY)
+                    box.Position = Vector2.new(posX, posY)
+                    box.Color = color
+                    box.Visible = true
+                else box.Visible = false end
+
+                if Config.CornerESP then
+                    local length = sizeX / 4
+                    corners.TopLeftH.From = Vector2.new(posX, posY); corners.TopLeftH.To = Vector2.new(posX + length, posY)
+                    corners.TopLeftV.From = Vector2.new(posX, posY); corners.TopLeftV.To = Vector2.new(posX, posY + length)
+                    corners.TopRightH.From = Vector2.new(posX + sizeX, posY); corners.TopRightH.To = Vector2.new(posX + sizeX - length, posY)
+                    corners.TopRightV.From = Vector2.new(posX + sizeX, posY); corners.TopRightV.To = Vector2.new(posX + sizeX, posY + length)
+                    corners.BotLeftH.From = Vector2.new(posX, posY + sizeY); corners.BotLeftH.To = Vector2.new(posX + length, posY + sizeY)
+                    corners.BotLeftV.From = Vector2.new(posX, posY + sizeY); corners.BotLeftV.To = Vector2.new(posX, posY + sizeY - length)
+                    corners.BotRightH.From = Vector2.new(posX + sizeX, posY + sizeY); corners.BotRightH.To = Vector2.new(posX + sizeX - length, posY + sizeY)
+                    corners.BotRightV.From = Vector2.new(posX + sizeX, posY + sizeY); corners.BotRightV.To = Vector2.new(posX + sizeX, posY + sizeY - length)
+                    for _, c in pairs(corners) do c.Color = color; c.Visible = true end
+                else for _, c in pairs(corners) do c.Visible = false end end
+
+                if Config.Tracers then
+                    tracer.From = screenCenterBottom
+                    tracer.To = Vector2.new(pos.X, pos.Y + (sizeY / 2))
+                    tracer.Color = color
+                    tracer.Visible = true
+                else tracer.Visible = false end
             else
-                box.Visible = false
-                tracer.Visible = false
+                box.Visible = false; tracer.Visible = false
                 for _, c in pairs(corners) do c.Visible = false end
             end
-        end)
-    end
-    coroutine.wrap(update)()
+        else
+            box.Visible = false; tracer.Visible = false
+            for _, c in pairs(corners) do c.Visible = false end
+        end
+    end)
 end
 
--- Удаление Drawing объектов при выходе игрока
 Players.PlayerRemoving:Connect(function(player)
     if drawingVisuals[player] then
-        drawingVisuals[player].Box:Destroy()
-        drawingVisuals[player].Tracer:Destroy()
-        for _, c in pairs(drawingVisuals[player].Corners) do c:Destroy() end
+        pcall(function()
+            drawingVisuals[player].Box:Destroy()
+            drawingVisuals[player].Tracer:Destroy()
+            for _, c in pairs(drawingVisuals[player].Corners) do c:Destroy() end
+        end)
         drawingVisuals[player] = nil
     end
 end)
 
--- Включение/Выключение старого Billboard ESP
 local function applyPlayerESP(player)
     if player == LocalPlayer then return end
     local function onChar(character)
@@ -380,85 +341,29 @@ local function applyPlayerESP(player)
 end
 
 local function toggleNameESP(state)
-    if state then
-        for _, p in ipairs(Players:GetPlayers()) do applyPlayerESP(p) end
-    else
-        for _, f in pairs(espFolders) do pcall(function() f:Destroy() end) end
-        table.clear(espFolders)
-    end
+    if state then for _, p in ipairs(Players:GetPlayers()) do applyPlayerESP(p) end
+    else for _, f in pairs(espFolders) do pcall(function() f:Destroy() end) end; table.clear(espFolders) end
 end
 
--- Инициализация Drawing для всех
-for _, p in ipairs(Players:GetPlayers()) do CreateDrawingESP(p) end
-Players.PlayerAdded:Connect(CreateDrawingESP)
+if hasDrawing then
+    for _, p in ipairs(Players:GetPlayers()) do CreateDrawingESP(p) end
+    Players.PlayerAdded:Connect(CreateDrawingESP)
+end
 
-
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: VISUALS ]] --
+-- [[ VISUALS CONTROLS ]] --
 local function updateFOV()
     table.insert(connections, RunService.RenderStepped:Connect(function()
         if Camera.FieldOfView ~= Config.FOVValue then Camera.FieldOfView = Config.FOVValue end
     end))
 end
-
-local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(1, -5, 0, 35)
-FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-FOVFrame.BorderSizePixel = 0
-FOVFrame.Parent = VisualsTab
-
-local FOVLabel = Instance.new("TextLabel")
-FOVLabel.Size = UDim2.new(0, 100, 1, 0)
-FOVLabel.Position = UDim2.new(0, 10, 0, 0)
-FOVLabel.BackgroundTransparency = 1
-FOVLabel.Text = "Режим обзора (FOV)"
-FOVLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-FOVLabel.Font = Enum.Font.GothamMedium
-FOVLabel.TextSize = 12
-FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
-FOVLabel.Parent = FOVFrame
-
-local FOVBtn = Instance.new("TextButton")
-FOVBtn.Size = UDim2.new(0, 60, 0, 20)
-FOVBtn.Position = UDim2.new(1, -70, 0.5, -10)
-FOVBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-FOVBtn.Text = "90 FOV"
-FOVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FOVBtn.Font = Enum.Font.GothamBold
-FOVBtn.TextSize = 11
-FOVBtn.Parent = FOVFrame
-local FBCorn = Instance.new("UICorner")
-FBCorn.CornerRadius = UDim.new(0, 4)
-FBCorn.Parent = FOVBtn
-
-FOVBtn.MouseButton1Click:Connect(function()
-    if Config.FOVValue == 70 then Config.FOVValue = 95; FOVBtn.Text = "95 FOV"
-    elseif Config.FOVValue == 95 then Config.FOVValue = 110; FOVBtn.Text = "110 FOV"
-    else Config.FOVValue = 70; FOVBtn.Text = "70 Default" end
-end)
 updateFOV()
 
-local function applySkyMod(state)
-    if state then
-        Lighting.Ambient = Config.SkyColor
-        Lighting.OutdoorAmbient = Config.SkyColor
-        Lighting.FogColor = Config.SkyColor
-    else
-        Lighting.Ambient = Color3.fromRGB(128, 128, 128)
-        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-    end
-end
-
--- Добавляем переключатели в интерфейс
 CreateToggle(VisualsTab, "Текстовый ESP (Никнеймы)", "ESP", toggleNameESP)
 CreateToggle(VisualsTab, "Квадратный ESP (Box)", "BoxESP")
 CreateToggle(VisualsTab, "Угловой ESP (Corner)", "CornerESP")
 CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers")
-CreateToggle(VisualsTab, "Кастомный цвет неба", "CustomSky", applySkyMod)
 
-
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: EXPLOITS ]] --
-
--- Авто-скиллчек
+-- [[ EXPLOITS CONTROLS ]] --
 local function togglePerfectSkillCheck(state)
     if not state then return end
     local pGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -477,10 +382,8 @@ local function togglePerfectSkillCheck(state)
     table.insert(connections, pGui.DescendantAdded:Connect(scanUI))
 end
 
--- Функция Remote / Distance Repair (Ремонт генератора на ходу)
 table.insert(connections, RunService.Heartbeat:Connect(function()
     if Config.RemoteRepair and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        -- Если мы стоим рядом с генератором и начали чинить, фиксируем его
         if not lockedGenerator then
             for _, obj in ipairs(Workspace:GetDescendants()) do
                 if obj.Name:lower():find("generator") or obj:GetAttribute("Type") == "Generator" then
@@ -492,22 +395,55 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                 end
             end
         end
-
-        -- Эмуляция удержания починки, даже если ушли от объекта
         if lockedGenerator then
-            local interactionAttribute = lockedGenerator:GetAttribute("Interacting") or lockedGenerator:FindFirstChild("Interacting")
-            -- Посылаем сетевой сигнал или триггерим локальный атрибут починки
             if lockedGenerator:FindFirstChild("RemoteEvent") then
                 lockedGenerator.RemoteEvent:FireServer("Repair", true)
             elseif lockedGenerator:GetAttribute("Progress") then
-                -- Пассивный «подкрутщик» прогресса, если игра обрабатывает его на стороне клиента
                 local currentProg = lockedGenerator:GetAttribute("Progress")
                 if currentProg and currentProg < 100 then
                     lockedGenerator:SetAttribute("Progress", currentProg + 0.1)
                 end
             end
         end
-    else
-        -- Сбрасываем таргет, если функция отключена
+    else lockedGenerator = nil end
+end))
+
+CreateToggle(ExploitsTab, "Perfect Auto-Skillcheck", "PerfectSkillCheck", togglePerfectSkillCheck)
+CreateToggle(ExploitsTab, "Дистанционный ремонт (Remote Repair)", "RemoteRepair")
+
+-- [[ ОТКРЫТИЕ / ЗАКРЫТИЕ ]] --
+local MenuVisible = true
+local function ToggleMenu()
+    MenuVisible = not MenuVisible
+    TweenService:Create(MainFrame, TweenInfo.new(0.15), {
+        Size = MenuVisible and UDim2.new(0, 460, 0, 320) or UDim2.new(0, 460, 0, 0)
+    }):Play()
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
+        ToggleMenu()
+    elseif input.KeyCode == Enum.KeyCode.X and not gameProcessed then
         lockedGenerator = nil
-  
+    end
+end)
+
+-- Создаем маленькую невидимую кнопку-запасной вариант в левом верхнем углу экрана
+-- Если Insert не работает, можно просто кликнуть в левый верхний угол экрана
+local TouchToggle = Instance.new("TextButton")
+TouchToggle.Size = UDim2.new(0, 30, 0, 30)
+TouchToggle.Position = UDim2.new(0, 10, 0, 10)
+TouchToggle.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+TouchToggle.BackgroundTransparency = 0.7
+TouchToggle.Text = "L"
+TouchToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+TouchToggle.Font = Enum.Font.GothamBold
+TouchToggle.TextSize = 14
+TouchToggle.Parent = ScreenGui
+local TCorn = Instance.new("UICorner")
+TCorn.CornerRadius = UDim.new(1, 0)
+TCorn.Parent = TouchToggle
+
+TouchToggle.MouseButton1Click:Connect(ToggleMenu)
+
+print("[LUNA V4]: Загружено в безопасном режиме размещения!")
