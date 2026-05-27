@@ -1,0 +1,235 @@
+-- [[ LUNA Premium Interface - Violence District ]] --
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Настройки функций
+local Config = { Noclip = false, ESP = false, AutoSkillCheck = false }
+local espObjects = {}
+local connections = {}
+
+-- [[ СОЗДАНИЕ ИНТЕРФЕЙСА (GUI) ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "Luna_Core"
+ScreenGui.ResetOnSpawn = false
+-- Защита от обнаружения обычными скриптами игры (скрываем в CoreGui, если инжектор позволяет)
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Главная панель
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 350, 0, 260)
+MainFrame.Position = UDim2.new(0.5, -175, 0.4, -130)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+-- Скругление углов
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Обводка (Glow / Stroke)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 1.5
+UIStroke.Color = Color3.fromRGB(0, 170, 255) -- Лунный голубой
+UIStroke.Parent = MainFrame
+
+-- Заголовок
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+Title.Text = "  LUNA | Violence District"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Подзаголовок (кнопка закрытия инфо)
+local InfoText = Instance.new("TextLabel")
+InfoText.Size = UDim2.new(0, 120, 0, 40)
+InfoText.Position = UDim2.new(1, -130, 0, 0)
+InfoText.BackgroundTransparency = 1
+InfoText.Text = "[Insert] Свернуть"
+InfoText.TextColor3 = Color3.fromRGB(150, 150, 150)
+InfoText.Font = Enum.Font.Gotham
+InfoText.TextSize = 12
+InfoText.TextXAlignment = Enum.TextXAlignment.Right
+InfoText.Parent = MainFrame
+
+-- Контейнер для кнопок
+local Container = Instance.new("Frame")
+Container.Size = UDim2.new(1, -20, 1, -60)
+Container.Position = UDim2.new(0, 10, 0, 50)
+Container.BackgroundTransparency = 1
+Container.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.Parent = Container
+
+-- [[ ФУНКЦИОНАЛ ПЕРЕКЛЮЧАТЕЛЕЙ (TOGGLES) ]] --
+local function CreateToggle(name, propName, callback)
+    local ToggleFrame = Instance.new("Frame")
+    ToggleFrame.Size = UDim2.new(1, 0, 0, 45)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    ToggleFrame.BorderSizePixel = 0
+    ToggleFrame.Parent = Container
+    
+    local TFCorner = Instance.new("UICorner")
+    TFCorner.CornerRadius = UDim.new(0, 6)
+    TFCorner.Parent = ToggleFrame
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, -60, 1, 0)
+    TextLabel.Position = UDim2.new(0, 15, 0, 0)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Text = name
+    TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+    TextLabel.Font = Enum.Font.GothamMedium
+    TextLabel.TextSize = 14
+    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TextLabel.Parent = ToggleFrame
+
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 45, 0, 22)
+    Button.Position = UDim2.new(1, -60, 0.5, -11)
+    Button.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    Button.Text = ""
+    Button.Parent = ToggleFrame
+    
+    local BCorner = Instance.new("UICorner")
+    BCorner.CornerRadius = UDim.new(1, 0)
+    BCorner.Parent = Button
+    
+    local Circle = Instance.new("Frame")
+    Circle.Size = UDim2.new(0, 16, 0, 16)
+    Circle.Position = UDim2.new(0, 3, 0.5, -8)
+    Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Circle.Parent = Button
+    local CCorner = Instance.new("UICorner")
+    CCorner.CornerRadius = UDim.new(1, 0)
+    CCorner.Parent = Circle
+
+    -- Логика клика с анимацией
+    Button.MouseButton1Click:Connect(function()
+        Config[propName] = not Config[propName]
+        local enabled = Config[propName]
+        
+        -- Анимация цвета кнопки и движения кружка
+        TweenService:Create(Button, TweenInfo.new(0.2), {
+            BackgroundColor3 = enabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 50)
+        }):Play()
+        
+        TweenService:Create(Circle, TweenInfo.new(0.2), {
+            Position = enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        }):Play()
+        
+        if callback then callback(enabled) end
+    end)
+end
+
+-- [[ ЛОГИКА ЧИТОВ ]] --
+
+-- 1. Noclip
+table.insert(connections, RunService.Stepped:Connect(function()
+    if Config.Noclip and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetChildren()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end))
+
+-- 2. ESP
+local function applyESP(player)
+    if player == LocalPlayer then return end
+    local function characterAdded(character)
+        if not Config.ESP then return end
+        task.wait(0.5)
+        if espObjects[player] then espObjects[player]:Destroy() end
+        
+        local highlight = Instance.new("Highlight")
+        highlight.Parent = character
+        highlight.Adornee = character
+        highlight.FillOpacity = 0.3
+        highlight.OutlineOpacity = 1
+        
+        -- Проверка на убийцу (красный) или выжившего (зеленый)
+        if player.Team and (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("slasher") or player.Team.Name:lower():find("murder")) then
+            highlight.FillColor = Color3.fromRGB(255, 40, 40)
+            highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+        else
+            highlight.FillColor = Color3.fromRGB(40, 255, 120)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        end
+        espObjects[player] = highlight
+    end
+    player.CharacterAdded:Connect(characterAdded)
+    if player.Character then characterAdded(player.Character) end
+end
+
+local function toggleESP(state)
+    if state then
+        for _, p in ipairs(Players:GetPlayers()) do applyESP(p) end
+        table.insert(connections, Players.PlayerAdded:Connect(applyESP))
+    else
+        for p, h in pairs(espObjects) do if h then h:Destroy() end end
+        table.clear(espObjects)
+    end
+end
+
+-- 3. Auto Skill Check
+local function setupSkillCheck(state)
+    if not state then return end
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
+    if playerGui then
+        local connection = playerGui.DescendantAdded:Connect(function(descendant)
+            if Config.AutoSkillCheck and (descendant.Name == "SkillCheck" or descendant.Name:find("SkillCheck")) then
+                task.wait(0.04) -- Безопасный тайминг под пинг
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                task.wait(0.02)
+                vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+            end
+        end)
+        table.insert(connections, connection)
+    end
+end
+
+-- Инициализация кнопок в меню LUNA
+CreateToggle("Прохождение сквозь стены (Noclip)", "Noclip")
+CreateToggle("Подсветка игроков (ESP)", "ESP", toggleESP)
+CreateToggle("Автоматический Скиллчек", "AutoSkillCheck", setupSkillCheck)
+
+-- [[ УПРАВЛЕНИЕ МЕНЮ (INSERT) ]] --
+local MenuVisible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
+        MenuVisible = not MenuVisible
+        -- Плавное скрытие / появление GUI
+        TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = MenuVisible and UDim2.new(0, 350, 0, 260) or UDim2.new(0, 350, 0, 0)
+        }):Play()
+    end
+end)
+
+-- Плавное появление при старте скрипта
+MainFrame.Size = UDim2.new(0, 350, 0, 0)
+TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 350, 0, 260)
+}):Play()
+
+print("[LUNA]: Скрипт успешно загружен! Нажми 'Insert', чтобы свернуть или развернуть меню.")
