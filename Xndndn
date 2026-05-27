@@ -24,8 +24,12 @@ local Config = {
     Fullbright = false,
     ObjectESP = false,
     FOVValue = 70,
-    CustomSky = false,
-    SkyColor = Color3.fromRGB(120, 100, 255),
+    WallColor = false,
+    WallColorValue = Color3.fromRGB(120, 100, 255),
+    SkyColor = false,
+    SkyColorValue = Color3.fromRGB(0, 180, 255),
+    ParticleColor = false,
+    ParticleColorValue = Color3.fromRGB(255, 255, 255),
     PerfectSkillCheck = false
 }
 
@@ -41,7 +45,8 @@ local originalLighting = {
     Brightness = Lighting.Brightness,
     ClockTime = Lighting.ClockTime,
     FogEnd = Lighting.FogEnd,
-    GlobalShadows = Lighting.GlobalShadows
+    GlobalShadows = Lighting.GlobalShadows,
+    ColorShift_Top = Lighting.ColorShift_Top
 }
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -124,7 +129,7 @@ local function CreateTab(name)
     Page.Size = UDim2.new(1, 0, 1, 0)
     Page.BackgroundTransparency = 1
     Page.Visible = false
-    Page.CanvasSize = UDim2.new(0, 0, 0, 300)
+    Page.CanvasSize = UDim2.new(0, 0, 0, 350)
     Page.ScrollBarThickness = 0
     Page.Parent = ContentFrame
     tabs[name] = Page
@@ -146,7 +151,7 @@ local VisualsTab = CreateTab("Visuals")
 local ExploitsTab = CreateTab("Exploits")
 SwitchToTab("Main")
 
-local function CreateToggle(parent, name, propName, callback)
+local function CreateToggle(parent, name, propName, callback, hasColor, colorPropName, colorCallback)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, -5, 0, 35)
     Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
@@ -158,7 +163,7 @@ local function CreateToggle(parent, name, propName, callback)
     FCorn.Parent = Frame
 
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -50, 1, 0)
+    Label.Size = UDim2.new(1, -90, 1, 0)
     Label.Position = UDim2.new(0, 10, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = name
@@ -186,6 +191,68 @@ local function CreateToggle(parent, name, propName, callback)
         }):Play()
         if callback then callback(Config[propName]) end
     end)
+
+    if hasColor and colorPropName then
+        local ColorBtn = Instance.new("TextButton")
+        ColorBtn.Size = UDim2.new(0, 16, 0, 16)
+        ColorBtn.Position = UDim2.new(1, -75, 0.5, -8)
+        ColorBtn.BackgroundColor3 = Config[colorPropName]
+        ColorBtn.Text = ""
+        ColorBtn.Parent = Frame
+
+        local CCorn = Instance.new("UICorner")
+        CCorn.CornerRadius = UDim.new(0, 4)
+        CCorn.Parent = ColorBtn
+
+        local Palette = Instance.new("Frame")
+        Palette.Size = UDim2.new(0, 100, 0, 50)
+        Palette.Position = UDim2.new(1, -110, 1, 2)
+        Palette.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        Palette.BorderSizePixel = 0
+        Palette.Visible = false
+        Palette.ZIndex = 10
+        Palette.Parent = Frame
+
+        local PCorn = Instance.new("UICorner")
+        PCorn.CornerRadius = UDim.new(0, 4)
+        PCorn.Parent = Palette
+
+        local PGrid = Instance.new("UIGridLayout")
+        PGrid.CellSize = UDim2.new(0, 20, 0, 20)
+        PGrid.CellPadding = UDim2.new(0, 4, 0, 4)
+        PGrid.SortOrder = Enum.SortOrder.LayoutOrder
+        PGrid.Parent = Palette
+
+        local colors = {
+            Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 0, 255),
+            Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
+            Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 100, 255)
+        }
+
+        for _, col in ipairs(colors) do
+            local Choice = Instance.new("TextButton")
+            Choice.Size = UDim2.new(0, 20, 0, 20)
+            Choice.BackgroundColor3 = col
+            Choice.Text = ""
+            Choice.ZIndex = 11
+            Choice.Parent = Palette
+
+            local ChoiceCorn = Instance.new("UICorner")
+            ChoiceCorn.CornerRadius = UDim.new(0, 3)
+            ChoiceCorn.Parent = Choice
+
+            Choice.MouseButton1Click:Connect(function()
+                Config[colorPropName] = col
+                ColorBtn.BackgroundColor3 = col
+                Palette.Visible = false
+                if colorCallback then colorCallback(col) end
+            end)
+        end
+
+        ColorBtn.MouseButton1Click:Connect(function()
+            Palette.Visible = not Palette.Visible
+        end)
+    end
 end
 
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
@@ -322,16 +389,44 @@ FOVBtn.MouseButton1Click:Connect(function()
 end)
 updateFOV()
 
-local function applySkyMod(state)
+local function applyWallMod(state)
     if state then
-        Lighting.Ambient = Config.SkyColor
-        Lighting.OutdoorAmbient = Config.SkyColor
-        Lighting.FogColor = Config.SkyColor
+        Lighting.Ambient = Config.WallColorValue
     else
         Lighting.Ambient = originalLighting.Ambient
-        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
     end
 end
+
+local function applySkyMod(state)
+    if state then
+        Lighting.OutdoorAmbient = Config.SkyColorValue
+        Lighting.ColorShift_Top = Config.SkyColorValue
+        Lighting.FogColor = Config.SkyColorValue
+    else
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        Lighting.ColorShift_Top = originalLighting.ColorShift_Top
+        Lighting.FogColor = Color3.fromRGB(128, 128, 128)
+    end
+end
+
+local function updateParticles()
+    if Config.ParticleColor then
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("ParticleEmitter") then
+                local name = obj.Name:lower()
+                if name:find("geometric") or name:find("snow") or name:find("particle") then
+                    obj.Color = ColorSequence.new(Config.ParticleColorValue)
+                end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        updateParticles()
+    end
+end)
 
 table.insert(connections, RunService.RenderStepped:Connect(function()
     if Config.Fullbright then
@@ -453,74 +548,4 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
             local character = player.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             
-            if Config.Tracers and root and pcall(function() return Drawing end) then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                if onScreen then
-                    local tracer = tracerCache[player]
-                    if not tracer then
-                        tracer = Drawing.new("Line")
-                        tracer.Thickness = 1
-                        tracer.Transparency = 1
-                        tracerCache[player] = tracer
-                    end
-                    
-                    local isKiller = checkIsKiller(player, character)
-                    tracer.Color = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
-                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-                    tracer.Visible = true
-                else
-                    if tracerCache[player] then tracerCache[player].Visible = false end
-                end
-            else
-                if tracerCache[player] then tracerCache[player].Visible = false end
-            end
-        end
-    end
-    
-    for player, tracer in pairs(tracerCache) do
-        if not Players:FindFirstChild(player.Name) then
-            tracer:Remove()
-            tracerCache[player] = nil
-        end
-    end
-end))
-
-CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP")
-CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box")
-CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers")
-CreateToggle(VisualsTab, "Полная яркость (Fullbright)", "Fullbright", toggleFullbright)
-CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
-
-local function togglePerfectSkillCheck(state)
-    if not state then return end
-    local pGui = LocalPlayer:WaitForChild("PlayerGui")
-    
-    local function scanUI(descendant)
-        if Config.PerfectSkillCheck and descendant:IsA("GuiObject") then
-            local name = descendant.Name:lower()
-            if name:find("perfect") or name:find("great") or name:find("white") or name:find("bonus") then
-                task.wait(0.005) 
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                task.wait(0.01)
-                vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-            end
-        end
-    end
-    table.insert(connections, pGui.DescendantAdded:Connect(scanUI))
-end
-
-CreateToggle(ExploitsTab, "Perfect Auto-Skillcheck (Белая зона)", "PerfectSkillCheck", togglePerfectSkillCheck)
-
-local MenuVisible = true
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
-        MenuVisible = not MenuVisible
-        TweenService:Create(MainFrame, TweenInfo.new(0.15), {
-            Size = MenuVisible and UDim2.new(0, 460, 0, 300) or UDim2.new(0, 460, 0, 0)
-        }):Play()
-    end
-end)
-
-print("[LUNA V4]: Успешно добавлены Tracers, Fullbright и Anti-AFK. Скрипт готов к тестам!")
+        
