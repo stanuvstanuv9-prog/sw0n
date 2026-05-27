@@ -1,4 +1,4 @@
--- [[ LUNA V4 - Multi-Tab Premium Edition (Zenin UI Style) ]] --
+-- [[ LUNA V4 - Multi-Tab Premium Edition (Zenin UI Style FIXED) ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -64,7 +64,7 @@ Watermark.BorderSizePixel = 0
 Watermark.Parent = ScreenGui
 
 local WMCorner = Instance.new("UICorner")
-WMCorner.CornerRadius = UDim.new(0, 16) -- Глубокое красивое закругление как на фото
+WMCorner.CornerRadius = UDim.new(0, 16)
 WMCorner.Parent = Watermark
 
 local WMList = Instance.new("UIListLayout")
@@ -74,7 +74,6 @@ WMList.VerticalAlignment = Enum.VerticalAlignment.Center
 WMList.Padding = UDim.new(0, 10)
 WMList.Parent = Watermark
 
--- Функция для быстрых разделительных палочек "|"
 local function CreateWMSeparator()
     local Sep = Instance.new("Frame")
     Sep.Size = UDim2.new(0, 1, 0, 14)
@@ -83,7 +82,7 @@ local function CreateWMSeparator()
     Sep.Parent = Watermark
 end
 
--- 1. Элемент: Круглое неоновое Лого "Z" (в нашем случае "L")
+-- 1. Логотип
 local LogoFrame = Instance.new("Frame")
 LogoFrame.Size = UDim2.new(0, 20, 0, 20)
 LogoFrame.BackgroundColor3 = Color3.fromRGB(28, 22, 22)
@@ -98,26 +97,26 @@ local LogoText = Instance.new("TextLabel")
 LogoText.Size = UDim2.new(1, 0, 1, 0)
 LogoText.BackgroundTransparency = 1
 LogoText.Text = "L"
-LogoText.TextColor3 = Color3.fromRGB(255, 60, 60) -- Красный неоновый акцент
+LogoText.TextColor3 = Color3.fromRGB(255, 60, 60)
 LogoText.Font = Enum.Font.GothamBlack
 LogoText.TextSize = 12
 LogoText.Parent = LogoFrame
 
 CreateWMSeparator()
 
--- 2. Элемент: Имя софта
+-- 2. Название софта
 local NameText = Instance.new("TextLabel")
 NameText.Size = UDim2.new(0, 45, 0, 20)
 NameText.BackgroundTransparency = 1
 NameText.Text = "luna"
 NameText.TextColor3 = Color3.fromRGB(240, 240, 240)
-NameText.Font = Enum.Font.GothamBold -- Жирный шрифт
+NameText.Font = Enum.Font.GothamBold
 NameText.TextSize = 13
 NameText.Parent = Watermark
 
 CreateWMSeparator()
 
--- 3. Элемент: Сборка / Версия
+-- 3. Версия
 local StatusText = Instance.new("TextLabel")
 StatusText.Size = UDim2.new(0, 55, 0, 20)
 StatusText.BackgroundTransparency = 1
@@ -127,12 +126,11 @@ StatusText.Font = Enum.Font.GothamBold
 StatusText.TextSize = 12
 StatusText.Parent = Watermark
 
--- Автоматическое масштабирование ватермарки под контент
+-- Ресайз бара под контент
 Watermark.Size = UDim2.new(0, WMList.AbsoluteContentSize.X + 25, 0, 32)
 WMList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Watermark.Size = UDim2.new(0, WMList.AbsoluteContentSize.X + 25, 0, 32)
 end)
-
 
 -- ======================================================= --
 -- [[ ОСНОВНОЕ МЕНЮ С ОБНОВЛЕННЫМИ ЖИРНЫМИ ШРИФТАМИ ]] --
@@ -165,7 +163,7 @@ Logo.Size = UDim2.new(1, 0, 0, 45)
 Logo.BackgroundTransparency = 1
 Logo.Text = "LUNA V4"
 Logo.TextColor3 = Color3.fromRGB(255, 60, 60)
-Logo.Font = Enum.Font.GothamBlack -- Максимально жирный шрифт для логотипа
+Logo.Font = Enum.Font.GothamBlack
 Logo.TextSize = 18
 Logo.Parent = Sidebar
 
@@ -202,7 +200,7 @@ local function CreateTab(name)
     TabButton.BackgroundTransparency = 1
     TabButton.Text = "  " .. name
     TabButton.TextColor3 = Color3.fromRGB(140, 140, 145)
-    TabButton.Font = Enum.Font.GothamBold -- Жирные шрифты в меню
+    TabButton.Font = Enum.Font.GothamBold
     TabButton.TextSize = 13
     TabButton.TextXAlignment = Enum.TextXAlignment.Left
     TabButton.Parent = TabBtnContainer
@@ -234,7 +232,6 @@ local VisualsTab = CreateTab("Visuals")
 local ExploitsTab = CreateTab("Exploits")
 SwitchToTab("Main")
 
--- Кастомные премиум переключатели (Toggles) с жирным текстом
 local function CreateToggle(parent, name, propName, callback)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, -5, 0, 38)
@@ -248,11 +245,11 @@ local function CreateToggle(parent, name, propName, callback)
 
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, -50, 1, 0)
-    Label.Position = UDim2.new(0, 12)
+    Label.Position = UDim2.new(0, 12, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = name
     Label.TextColor3 = Color3.fromRGB(235, 235, 235)
-    Label.Font = Enum.Font.GothamBold -- Усиленный жирный текст настроек
+    Label.Font = Enum.Font.GothamBold
     Label.TextSize = 12
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Frame
@@ -278,10 +275,9 @@ local function CreateToggle(parent, name, propName, callback)
 end
 
 -- ======================================================= --
--- [[ ЛОГИКА ФУНКЦИЙ (БЕЗ ИЗМЕНЕНИЙ, ВСЕ РАБОТАЕТ) ]] --
+-- [[ ЛОГИКА ФУНКЦИЙ ]] --
 -- ======================================================= --
 
--- Движение и обход АФК
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
     if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -331,7 +327,6 @@ CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
 CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
 CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
 
--- Настройки визуализации и FOV
 local FOVFrame = Instance.new("Frame")
 FOVFrame.Size = UDim2.new(1, -5, 0, 38)
 FOVFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
@@ -412,7 +407,6 @@ local function toggleFullbright(state)
     end
 end
 
--- Сканнер Маньяков
 local function checkIsKiller(player, character)
     if not player then return false end
     if player.Team then
@@ -441,7 +435,6 @@ local function checkIsKiller(player, character)
     return false
 end
 
--- Рендер ESP и Обновленных Боксов
 task.spawn(function()
     while task.wait(0.1) do
         for _, player in ipairs(Players:GetPlayers()) do
@@ -470,7 +463,7 @@ task.spawn(function()
                             label.Name = "Label"
                             label.Size = UDim2.new(1, 0, 1, 0)
                             label.BackgroundTransparency = 1
-                            label.Font = Enum.Font.GothamBlack -- Жирные шрифты над головами игроков
+                            label.Font = Enum.Font.GothamBlack
                             label.TextSize = 11
                             label.TextStrokeTransparency = 0
                             label.Parent = textESP
@@ -504,7 +497,7 @@ task.spawn(function()
     end
 end)
 
--- Рендер Трейсеров (Линий)
+-- [[ ИСПРАВЛЕННЫЙ РЕНДЕР ТРЕЙСЕРОВ ]] --
 table.insert(connections, RunService.RenderStepped:Connect(function()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -533,4 +526,16 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
                 if tracerCache[player] then tracerCache[player].Visible = false end
             end
         end
-    e
+    end
+end)) -- ТУТ БЫЛА ОШИБКА, СЕЙЧАС ВСЕ ИДЕАЛЬНО Закрыто!
+
+CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP")
+CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box")
+CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers")
+CreateToggle(VisualsTab, "Полная яркость (Fullbright)", "Fullbright", toggleFullbright)
+CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
+
+local function togglePerfectSkillCheck(state)
+    if not state then return end
+    local pGui = LocalPlayer:WaitForChild("PlayerGui")
+    l
