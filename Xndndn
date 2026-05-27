@@ -29,6 +29,9 @@ local success, launchError = pcall(function()
         Box            = false,
         Tracers        = false,
         Fullbright     = false,
+        NoFog          = false, -- НОВАЯ НАСТРОЙКА: Удаление тумана
+        TimeValue      = 14,    -- НОВАЯ НАСТРОЙКА: Время суток
+        GhostEffect    = false, -- НОВАЯ НАСТРОЙКА: Эффект призрака
         ObjectESP      = false,
         FOVValue       = 70,
         WallColor      = false,
@@ -38,15 +41,16 @@ local success, launchError = pcall(function()
         Particles      = false,
         ParticleMode   = "Snow",
         PerfectSkillCheck = false,
-        Trails         = false, -- НАСТРОЙКА ШЛЕЙФА
-        TrailColorValue = Color3.fromRGB(255, 255, 255), -- ЦВЕТ ШЛЕЙФА
-        TrailMode      = "Default" -- НОВЫЙ РЕЖИМ: "Default" (Обычный) или "Worm" (Червяк)
+        Trails         = false, 
+        TrailColorValue = Color3.fromRGB(255, 255, 255), 
+        TrailMode      = "Default" 
     }
 
     local connections   = {}
     local tabs          = {}
     local tabButtons    = {}
     local isSprinting   = false
+    local menuBlur      = nil -- Для размытия фона
 
     local originalLighting = {
         Ambient        = Lighting.Ambient,
@@ -79,8 +83,8 @@ local success, launchError = pcall(function()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 460, 0, 300)
-    MainFrame.Position = UDim2.new(0.5, -230, 0.5, -150)
+    MainFrame.Size = UDim2.new(0, 460, 0, 340) -- Немного увеличили высоту под новые функции
+    MainFrame.Position = UDim2.new(0.5, -230, 0.5, -170)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -89,6 +93,24 @@ local success, launchError = pcall(function()
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = MainFrame
+
+    -- Функция управления размытием заднего фона
+    local function ToggleBlur(state)
+        if state then
+            if not menuBlur then
+                menuBlur = Instance.new("BlurEffect")
+                menuBlur.Size = 15
+                menuBlur.Name = "LunaMenuBlur"
+                menuBlur.Parent = Lighting
+            end
+        else
+            if menuBlur then
+                menuBlur:Destroy()
+                menuBlur = nil
+            end
+        end
+    end
+    ToggleBlur(true) -- Изначально меню открыто -> размытие включено
 
     do
         local dragging, dragStart, startPos
@@ -392,6 +414,74 @@ local success, launchError = pcall(function()
         end
     end
 
+    -- НОВЫЙ КОМПОНЕНТ: Слайдер (Ползунок) времени суток
+    local function CreateSlider(parent, labelText, min, max, default, callback)
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(1, -5, 0, 45)
+        Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+        Frame.BorderSizePixel = 0
+        Frame.Parent = parent
+
+        local FCorn = Instance.new("UICorner")
+        FCorn.CornerRadius = UDim.new(0, 4)
+        FCorn.Parent = Frame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -10, 0, 20)
+        Label.Position = UDim2.new(0, 10, 0, 2)
+        Label.BackgroundTransparency = 1
+        Label.Text = labelText .. ": " .. tostring(default)
+        Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        Label.Font = Enum.Font.GothamMedium
+        Label.TextSize = 11
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = Frame
+
+        local SliderBtn = Instance.new("TextButton")
+        SliderBtn.Size = UDim2.new(1, -20, 0, 8)
+        SliderBtn.Position = UDim2.new(0, 10, 0, 26)
+        SliderBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        SliderBtn.Text = ""
+        SliderBtn.Parent = Frame
+        Instance.new("UICorner", SliderBtn).CornerRadius = UDim.new(1, 0)
+
+        local Progress = Instance.new("Frame")
+        Progress.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+        Progress.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+        Progress.BorderSizePixel = 0
+        Progress.Parent = SliderBtn
+        Instance.new("UICorner", Progress).CornerRadius = UDim.new(1, 0)
+
+        local snap = false
+        local function updateSlider(input)
+            local absPos = SliderBtn.AbsolutePosition.X
+            local absSize = SliderBtn.AbsoluteSize.X
+            local ratio = math.clamp((input.Position.X - absPos) / absSize, 0, 1)
+            local value = math.floor(min + (max - min) * ratio)
+            
+            Progress.Size = UDim2.new(ratio, 0, 1, 0)
+            Label.Text = labelText .. ": " .. tostring(value)
+            callback(value)
+        end
+
+        SliderBtn.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                snap = true
+                updateSlider(inp)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                snap = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(inp)
+            if snap and inp.UserInputType == Enum.UserInputType.MouseMovement then
+                updateSlider(inp)
+            end
+        end)
+    end
+
     -- ── Логика Шлейфа (Trails) ───────────────────────────────────
 
     local function updateLocalTrail()
@@ -428,13 +518,11 @@ local success, launchError = pcall(function()
             local trail = char:FindFirstChild("LunaTrailInstance")
             if trail then
                 trail.Color = ColorSequence.new(Config.TrailColorValue)
-                
-                -- Динамическое изменение толщины и режима отображения линии
                 if Config.TrailMode == "Worm" then
-                    trail.WidthScale = NumberSequence.new(0.04) -- Сделать шлейф очень тонким («червяк»)
-                    trail.FaceCamera = true -- Поворачивать лицом к камере, чтобы линия была видна четко
+                    trail.WidthScale = NumberSequence.new(0.04) 
+                    trail.FaceCamera = true 
                 else
-                    trail.WidthScale = NumberSequence.new(1.0) -- Обычный стандартный шлейф
+                    trail.WidthScale = NumberSequence.new(1.0) 
                     trail.FaceCamera = false
                 end
             end
@@ -446,6 +534,59 @@ local success, launchError = pcall(function()
             if a1 then a1:Destroy() end
         end
     end
+
+    -- ── Логика Эффекта призрака (Ghost Effect) ──────────────────────
+
+    task.spawn(function()
+        while task.wait(0.1) do
+            if Config.GhostEffect and LocalPlayer.Character then
+                local char = LocalPlayer.Character
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                
+                -- Создаем клонов только при движении
+                if hrp and hum and hum.MoveDirection.Magnitude > 0 then
+                    char.Archivable = true
+                    local clone = char:Clone()
+                    char.Archivable = false
+                    
+                    -- Очищаем клон от скриптов и лишних GUI элементов
+                    for _, v in ipairs(clone:GetDescendants()) do
+                        if v:IsA("LuaSourceContainer") or v:IsA("BillboardGui") or v:IsA("ScreenGui") or v:IsA("Highlight") then
+                            v:Destroy()
+                        elseif v:IsA("BasePart") then
+                            v.CanCollide = false
+                            v.Anchored = true
+                            v.Material = Enum.Material.ForceField
+                            v.Color = Config.TrailColorValue or Color3.fromRGB(0, 180, 255)
+                        end
+                    end
+                    
+                    local cloneHrp = clone:FindFirstChild("HumanoidRootPart")
+                    if cloneHrp then
+                        clone.Parent = Workspace
+                        
+                        -- Плавное исчезновение клона
+                        task.spawn(function()
+                            for i = 0, 1, 0.1 do
+                                task.wait(0.04)
+                                for _, part in ipairs(clone:GetChildren()) do
+                                    if part:IsA("BasePart") then
+                                        part.Transparency = i
+                                    elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then
+                                        part.Handle.Transparency = i
+                                    end
+                                end
+                            end
+                            clone:Destroy()
+                        end)
+                    else
+                        clone:Destroy()
+                    end
+                end
+            end
+        end
+    end)
 
     -- ── Рендер лупы коннектов ────────────────────────────────────
 
@@ -498,8 +639,10 @@ local success, launchError = pcall(function()
             Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
             Lighting.Brightness     = 3
             Lighting.ClockTime      = 14
-            Lighting.FogEnd         = 999999
             Lighting.GlobalShadows  = false
+        end
+        if Config.NoFog then
+            Lighting.FogEnd         = 999999
         end
     end))
 
@@ -529,7 +672,7 @@ local success, launchError = pcall(function()
             Lighting.Ambient        = originalLighting.Ambient
             Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
             Lighting.Brightness     = originalLighting.Brightness
-            Lighting.ClockTime      = originalLighting.ClockTime
+            Lighting.ClockTime      = Config.TimeValue -- Возвращаем к значению ползунка
             Lighting.FogEnd         = originalLighting.FogEnd
             Lighting.GlobalShadows  = originalLighting.GlobalShadows
             Lighting.ColorShift_Top = originalLighting.ColorShift_Top
@@ -696,7 +839,7 @@ local success, launchError = pcall(function()
                 local isKiller   = checkIsKiller(player, character)
                 local espColor   = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
                 local espText    = isKiller
-                    and ("[ МАНЬЯК ] " .. player.Name)
+                and ("[ МАНЬЯК ] " .. player.Name)
                     or  ("[ Выживший ] " .. player.Name)
 
                 getOrCreateBillboard(character, espColor, espText)
@@ -845,8 +988,17 @@ local success, launchError = pcall(function()
     CreateToggle(VisualsTab, "ESP Подсветка (Chams)", "Box") 
     CreateToggle(VisualsTab, "Tracers (Линии к игрокам)", "Tracers")
     CreateToggle(VisualsTab, "Fullbright (Яркость)", "Fullbright", toggleFullbright)
+    CreateToggle(VisualsTab, "Удаление тумана (No Fog)", "NoFog") -- ДОБАВЛЕНО
+    CreateToggle(VisualsTab, "Эффект призрака (Ghost)", "GhostEffect") -- ДОБАВЛЕНО
     
-    -- ТУМБЛЕР ШЛЕЙФА С ЦВЕТОВОЙ ПАЛИТРОЙ ХСВ
+    -- Ползунок смены времени суток (Time Changer) -- ДОБАВЛЕНО
+    CreateSlider(VisualsTab, "Время суток (Часы)", 0, 24, 14, function(val)
+        Config.TimeValue = val
+        if not Config.Fullbright then
+            Lighting.ClockTime = val
+        end
+    end)
+
     CreateToggle(VisualsTab, "Линия за спиной (Trails)", "Trails", function()
         pcall(updateLocalTrail)
     end, true, "TrailColorValue", function(col)
@@ -854,7 +1006,6 @@ local success, launchError = pcall(function()
         pcall(updateLocalTrail)
     end)
 
-    -- БЛОК ВЫБОРА РЕЖИМА ШЛЕЙФА (Обычный / Червяк)
     do
         local TModeFrame = Instance.new("Frame")
         TModeFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -918,7 +1069,6 @@ local success, launchError = pcall(function()
         UpdateParticles()
     end)
 
-    -- Кнопка выбора погоды (Снег/Дождь)
     do
         local WFrame = Instance.new("Frame")
         WFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -967,7 +1117,6 @@ local success, launchError = pcall(function()
         end)
     end
 
-    -- FOV кнопка
     do
         local FOVFrame = Instance.new("Frame")
         FOVFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -1004,7 +1153,6 @@ local success, launchError = pcall(function()
         FBCorn.CornerRadius = UDim.new(0, 4)
         FBCorn.Parent = FOVBtn
 
-        
         FOVBtn.MouseButton1Click:Connect(function()
             if Config.FOVValue == 70 then
                 Config.FOVValue = 95
@@ -1023,7 +1171,6 @@ local success, launchError = pcall(function()
 
     CreateToggle(ExploitsTab, "Perfect Skill Check", "PerfectSkillCheck")
 
-    -- КНОПКА: ТП к генератору
     do
         local TpFrame = Instance.new("Frame")
         TpFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -1072,7 +1219,6 @@ local success, launchError = pcall(function()
         end)
     end
 
-    -- КНОПКА: ТП к воротам
     do
         local GateFrame = Instance.new("Frame")
         GateFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -1121,11 +1267,12 @@ local success, launchError = pcall(function()
         end)
     end
 
-    -- Открытие/Закрытие меню на правый контрол (RightControl)
+    -- Переключение видимости меню на Insert или RightShift с Blur-эффектом
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
-        if input.KeyCode == Enum.KeyCode.RightControl then
+        if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift then
             MainFrame.Visible = not MainFrame.Visible
+            ToggleBlur(MainFrame.Visible)
         end
     end)
 
