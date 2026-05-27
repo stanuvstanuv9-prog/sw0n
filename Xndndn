@@ -378,7 +378,7 @@ task.spawn(function()
                     
                     local isKiller = checkIsKiller(player, character)
                     local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
-                    local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
+                    local currentText = isKiller and "[ LUNA BYPASS ]" or "[ LUNA BYPASS]"
                     
                     -- ТЕКСТ ESP
                     local textESP = folder:FindFirstChild("Luna_Text")
