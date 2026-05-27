@@ -1,4 +1,3 @@
--- [[ LUNA V4 - Multi-Tab Premium Edition ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,33 +9,32 @@ local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 
--- Глобальный конфиг софта
 local Config = {
-    -- Main
     CFrameSpeed = false,
     SpeedValue = 2.5,
     NoFall = false,
     Noclip = false,
-    AntiAFK = false, -- Новый тумблер Анти-кика
-    -- Visuals
+    AntiAFK = false,
+    AutoSprint = false,
+    NormalWalkSpeed = 16,
+    SprintWalkSpeed = 25,
     ESP = false,
     Box = false, 
-    Tracers = false, -- Новый тумблер линий
-    Fullbright = false, -- Новый тумблер яркости
+    Tracers = false,
+    Fullbright = false,
     ObjectESP = false,
     FOVValue = 70,
     CustomSky = false,
     SkyColor = Color3.fromRGB(120, 100, 255),
-    -- Exploits
     PerfectSkillCheck = false
 }
 
 local connections = {}
 local tabs = {}
 local tabButtons = {}
-local tracerCache = {} -- Кэш для отрисовки линий
+local tracerCache = {}
+local isSprinting = false
 
--- Сохраняем дефолтные настройки света для отключения Fullbright
 local originalLighting = {
     Ambient = Lighting.Ambient,
     OutdoorAmbient = Lighting.OutdoorAmbient,
@@ -46,7 +44,6 @@ local originalLighting = {
     GlobalShadows = Lighting.GlobalShadows
 }
 
--- [[ СОЗДАНИЕ ИНТЕРФЕЙСА С ВКЛАДКАМИ ]] --
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Luna_V4"
 ScreenGui.ResetOnSpawn = false
@@ -191,14 +188,18 @@ local function CreateToggle(parent, name, propName, callback)
     end)
 end
 
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: MAIN ]] --
-
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
-    if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum and hum.MoveDirection.Magnitude > 0 then
-            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (Config.SpeedValue * dt * 10))
+            if Config.CFrameSpeed then
+                local currentSpeed = Config.SpeedValue
+                if Config.AutoSprint and isSprinting then
+                    currentSpeed = Config.SpeedValue * 1.8
+                end
+                hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (currentSpeed * dt * 10))
+            end
         end
     end
 end))
@@ -208,6 +209,13 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if Config.NoFall and hum:GetState() == Enum.HumanoidStateType.Freefall then
             hum:ChangeState(Enum.HumanoidStateType.Running)
+        end
+        if not Config.CFrameSpeed and Config.AutoSprint then
+            if isSprinting and hum.WalkSpeed ~= Config.SprintWalkSpeed then
+                hum.WalkSpeed = Config.SprintWalkSpeed
+            elseif not isSprinting and hum.WalkSpeed == Config.SprintWalkSpeed then
+                hum.WalkSpeed = Config.NormalWalkSpeed
+            end
         end
     end
 end))
@@ -220,7 +228,6 @@ table.insert(connections, RunService.Stepped:Connect(function()
     end
 end))
 
--- [[ ЛЕГКОВЕСНЫЙ ANTI-AFK ]] --
 local antiAfkConnection
 local function toggleAntiAFK(state)
     if state then
@@ -238,13 +245,30 @@ local function toggleAntiAFK(state)
     end
 end
 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+        isSprinting = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+        isSprinting = false
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if not Config.CFrameSpeed and hum.WalkSpeed == Config.SprintWalkSpeed then
+                hum.WalkSpeed = Config.NormalWalkSpeed
+            end
+        end
+    end
+end)
+
 CreateToggle(MainTab, "Кастомный Speedhack (CFrame)", "CFrameSpeed")
+CreateToggle(MainTab, "Авто спринт (Shift)", "AutoSprint")
 CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
 CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
 CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
-
-
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: VISUALS ]] --
 
 local function updateFOV()
     table.insert(connections, RunService.RenderStepped:Connect(function()
@@ -309,7 +333,6 @@ local function applySkyMod(state)
     end
 end
 
--- [[ ЛЕГКОВЕСНЫЙ FULLBRIGHT ]] --
 table.insert(connections, RunService.RenderStepped:Connect(function()
     if Config.Fullbright then
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
@@ -332,7 +355,6 @@ local function toggleFullbright(state)
     end
 end
 
--- Динамическая проверка роли (Маньяк / Выживший)
 local function checkIsKiller(player, character)
     if not player then return false end
     if player.Team then
@@ -361,7 +383,6 @@ local function checkIsKiller(player, character)
     return false
 end
 
--- [[ СИНХРОННЫЙ ДВИЖОК ВИЗУАЛОВ (ESP, BOX & TRACERS) ]] --
 task.spawn(function()
     while task.wait(0.1) do
         for _, player in ipairs(Players:GetPlayers()) do
@@ -380,7 +401,6 @@ task.spawn(function()
                     local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
                     local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
                     
-                    -- ТЕКСТ ESP
                     local textESP = folder:FindFirstChild("Luna_Text")
                     if Config.ESP then
                         if not textESP then
@@ -405,7 +425,6 @@ task.spawn(function()
                         if textESP then textESP:Destroy() end
                     end
                     
-                    -- БОКС ESP (HIGHLIGHT)
                     local boxESP = folder:FindFirstChild("Luna_Highlight")
                     if Config.Box then
                         if not boxESP then
@@ -428,7 +447,6 @@ task.spawn(function()
     end
 end)
 
--- [[ ОТРИСОВКА ЛИНИЙ (TRACERS) НА СВЕРХПЛАВНОМ ДВИЖКЕ ]] --
 table.insert(connections, RunService.RenderStepped:Connect(function()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -460,7 +478,6 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- Чистка кэша линий при выходе игрока
     for player, tracer in pairs(tracerCache) do
         if not Players:FindFirstChild(player.Name) then
             tracer:Remove()
@@ -471,12 +488,9 @@ end))
 
 CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP")
 CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box")
-CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers") -- Кнопка линий
-CreateToggle(VisualsTab, "Полная яркость (Fullbright)", "Fullbright", toggleFullbright) -- Кнопка яркости
+CreateToggle(VisualsTab, "Линии до игроков (Tracers)", "Tracers")
+CreateToggle(VisualsTab, "Полная яркость (Fullbright)", "Fullbright", toggleFullbright)
 CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
-
-
--- [[ НАПОЛНЕНИЕ ВКЛАДКИ: EXPLOITS ]] --
 
 local function togglePerfectSkillCheck(state)
     if not state then return end
@@ -499,8 +513,6 @@ end
 
 CreateToggle(ExploitsTab, "Perfect Auto-Skillcheck (Белая зона)", "PerfectSkillCheck", togglePerfectSkillCheck)
 
-
--- [[ УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ (INSERT) ]] --
 local MenuVisible = true
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
