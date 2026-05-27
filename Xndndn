@@ -18,6 +18,7 @@ local Config = {
     Noclip = false,
     -- Visuals
     ESP = false,
+    Box = false, -- Новый тумблер для обычных боксов
     ObjectESP = false,
     FOVValue = 70,
     CustomSky = false,
@@ -184,13 +185,12 @@ end
 
 -- [[ НАПОЛНЕНИЕ ВКЛАДКИ: MAIN ]] --
 
--- Реализация правильного CFrame Speedhack (в обход системного WalkSpeed)
+-- Реализация правильного CFrame Speedhack
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
     if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum and hum.MoveDirection.Magnitude > 0 then
-            -- Мягко проталкиваем вектор позиции вперед, куда нажат WASD/Стик
             hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (Config.SpeedValue * dt * 10))
         end
     end
@@ -230,7 +230,6 @@ local function updateFOV()
     end))
 end
 
--- Слайдер / Кнопки для быстрого переключения FOV
 local FOVFrame = Instance.new("Frame")
 FOVFrame.Size = UDim2.new(1, -5, 0, 35)
 FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
@@ -275,34 +274,42 @@ FOVBtn.MouseButton1Click:Connect(function()
 end)
 updateFOV()
 
--- Клиентское изменение цвета неба/атмосферы
 local function applySkyMod(state)
     if state then
         Lighting.Ambient = Config.SkyColor
         Lighting.OutdoorAmbient = Config.SkyColor
         Lighting.FogColor = Config.SkyColor
     else
-        -- Возвращаем дефолтные значения (примерные)
         Lighting.Ambient = Color3.fromRGB(128, 128, 128)
         Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     end
 end
 
--- Проверенные фиксы ESP из прошлой версии
-local function applyPlayerESP(player)
-    if player == LocalPlayer then return end
-    local function onChar(character)
-        if espFolders[player] then pcall(function() espFolders[player]:Destroy() end) end
-        if not Config.ESP then return end
-        
-        local root = character:WaitForChild("HumanoidRootPart", 5)
-        if not root then return end
-        
-        local folder = Instance.new("Folder")
-        folder.Name = "Luna_ESP"
-        folder.Parent = character
-        espFolders[player] = folder
+-- Функция создания и обновления визуалов для конкретного игрока
+local function drawVisuals(player, character)
+    if espFolders[player] then pcall(function() espFolders[player]:Destroy() end) end
+    if not Config.ESP and not Config.Box then return end
+    
+    local root = character:WaitForChild("HumanoidRootPart", 5)
+    if not root then return end
+    
+    local folder = Instance.new("Folder")
+    folder.Name = "Luna_Visuals"
+    folder.Parent = character
+    espFolders[player] = folder
 
+    -- Определение роли и выбор цвета
+    local isKiller = false
+    if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("beast")) then
+        isKiller = true
+    elseif character:FindFirstChildOfClass("Tool") or character:GetAttribute("Role") == "Killer" or player:GetAttribute("Role") == "Killer" then
+        isKiller = true
+    end
+    
+    local themeColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
+
+    -- Рендеринг текстового ESP
+    if Config.ESP then
         local bb = Instance.new("BillboardGui")
         bb.Size = UDim2.new(0, 160, 0, 40)
         bb.AlwaysOnTop = true
@@ -315,44 +322,58 @@ local function applyPlayerESP(player)
         txt.Font = Enum.Font.GothamBold
         txt.TextSize = 12
         txt.TextStrokeTransparency = 0
-        
-        local isKiller = false
-        if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("beast")) then
-            isKiller = true
-        elseif character:FindFirstChildOfClass("Tool") or character:GetAttribute("Role") == "Killer" then
-            isKiller = true
-        end
-
-        if isKiller then
-            txt.Text = "[ МАНЬЯК ]\n" .. player.DisplayName
-            txt.TextColor3 = Color3.fromRGB(255, 30, 30)
-        else
-            txt.Text = "[ Выживший ]\n" .. player.DisplayName
-            txt.TextColor3 = Color3.fromRGB(0, 255, 120)
-        end
+        txt.TextColor3 = themeColor
+        txt.Text = isKiller and ("[ МАНЬЯК ]\n" .. player.DisplayName) or ("[ Выживший ]\n" .. player.DisplayName)
         txt.Parent = bb
     end
-    player.CharacterAdded:Connect(onChar)
-    if player.Character then onChar(player.Character) end
-end
 
-local function toggleESP(state)
-    if state then
-        for _, p in ipairs(Players:GetPlayers()) do applyPlayerESP(p) end
-        table.insert(connections, Players.PlayerAdded:Connect(applyPlayerESP))
-    else
-        for _, f in pairs(espFolders) do pcall(function() f:Destroy() end) end
-        table.clear(espFolders)
+    -- Рендеринг обычных 3D Боксов
+    if Config.Box then
+        local box = Instance.new("SelectionBox")
+        box.Name = "Luna_Box"
+        box.Adornee = character
+        box.Color3 = themeColor
+        box.LineThickness = 0.05
+        box.SurfaceTransparency = 1 -- Полностью прозрачные грани, видны только ребра (рамка)
+        box.AlwaysOnTop = true
+        box.Parent = folder
     end
 end
 
+-- Массовое обновление всех игроков при переключении кнопок
+local function refreshVisuals()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            drawVisuals(p, p.Character)
+        end
+    end
+end
+
+-- Инициализация отслеживания игроков (подключается один раз при запуске)
+local function hookPlayer(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function(character)
+        task.wait(0.3) -- Небольшая задержка для загрузки частей тела
+        if character.Parent then drawVisuals(player, character) end
+    end)
+    if player.Character then drawVisuals(player, player.Character) end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do hookPlayer(p) end
+table.insert(connections, Players.PlayerAdded:Connect(hookPlayer))
+
+-- Функции для тумблеров интерфейса
+local function toggleESP(state) refreshVisuals() end
+local function toggleBox(state) refreshVisuals() end
+
 CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP", toggleESP)
+CreateToggle(VisualsTab, "Обычные боксы (Box ESP)", "Box", toggleBox) -- Наш новый тумблер!
 CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
 
 
 -- [[ НАПОЛНЕНИЕ ВКЛАДКИ: EXPLOITS ]] --
 
--- Умный авто-скиллчек, целящийся строго в Perfect/White Zone
+-- Умный авто-скиллчек
 local function togglePerfectSkillCheck(state)
     if not state then return end
     local pGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -360,9 +381,7 @@ local function togglePerfectSkillCheck(state)
     local function scanUI(descendant)
         if Config.PerfectSkillCheck and descendant:IsA("GuiObject") then
             local name = descendant.Name:lower()
-            -- Ищем триггер идеального попадания (обычно разработчики называют его Perfect, Great или White)
             if name:find("perfect") or name:find("great") or name:find("white") or name:find("bonus") then
-                -- Небольшое смещение тайминга для идеального эмулирования нажатия прямо внутри белой зоны
                 task.wait(0.005) 
                 local vim = game:GetService("VirtualInputManager")
                 vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
@@ -388,4 +407,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[LUNA V4]: Загрузка завершена. Переключайся по вкладкам 'Main', 'Visuals', 'Exploits'!")
+print("[LUNA V4]: Загрузка завершена. Боксы добавлены во вкладку Visuals!")
