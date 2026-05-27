@@ -1,551 +1,518 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
-local VirtualUser = game:GetService("VirtualUser")
-local LocalPlayer = Players.LocalPlayer
-local Workspace = game:GetService("Workspace")
-local Camera = Workspace.CurrentCamera
-
-local Config = {
-    CFrameSpeed = false,
-    SpeedValue = 2.5,
-    NoFall = false,
-    Noclip = false,
-    AntiAFK = false,
-    AutoSprint = false,
-    NormalWalkSpeed = 16,
-    SprintWalkSpeed = 25,
-    ESP = false,
-    Box = false, 
-    Tracers = false,
-    Fullbright = false,
-    ObjectESP = false,
-    FOVValue = 70,
-    WallColor = false,
-    WallColorValue = Color3.fromRGB(120, 100, 255),
-    SkyColor = false,
-    SkyColorValue = Color3.fromRGB(0, 180, 255),
-    ParticleColor = false,
-    ParticleColorValue = Color3.fromRGB(255, 255, 255),
-    PerfectSkillCheck = false
-}
-
-local connections = {}
-local tabs = {}
-local tabButtons = {}
-local tracerCache = {}
-local isSprinting = false
-
-local originalLighting = {
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    Brightness = Lighting.Brightness,
-    ClockTime = Lighting.ClockTime,
-    FogEnd = Lighting.FogEnd,
-    GlobalShadows = Lighting.GlobalShadows,
-    ColorShift_Top = Lighting.ColorShift_Top
-}
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Luna_V4"
-ScreenGui.ResetOnSpawn = false
-pcall(function() ScreenGui.Parent = CoreGui end)
-if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 460, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -230, 0.55, -150)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
-
-local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 120, 1, 0)
-Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
-Sidebar.BorderSizePixel = 0
-Sidebar.Parent = MainFrame
-
-local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 8)
-SidebarCorner.Parent = Sidebar
-
-local Logo = Instance.new("TextLabel")
-Logo.Size = UDim2.new(1, 0, 0, 40)
-Logo.BackgroundTransparency = 1
-Logo.Text = "LUNA V4"
-Logo.TextColor3 = Color3.fromRGB(0, 180, 255)
-Logo.Font = Enum.Font.GothamBold
-Logo.TextSize = 16
-Logo.Parent = Sidebar
-
-local TabBtnContainer = Instance.new("Frame")
-TabBtnContainer.Size = UDim2.new(1, 0, 1, -50)
-TabBtnContainer.Position = UDim2.new(0, 0, 0, 50)
-TabBtnContainer.BackgroundTransparency = 1
-TabBtnContainer.Parent = Sidebar
-
-local TabListLayout = Instance.new("UIListLayout")
-TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabListLayout.Padding = UDim.new(0, 4)
-TabListLayout.Parent = TabBtnContainer
-
-local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, -130, 1, -10)
-ContentFrame.Position = UDim2.new(0, 125, 0, 5)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.Parent = MainFrame
-
-local function SwitchToTab(tabName)
-    for name, frame in pairs(tabs) do
-        frame.Visible = (name == tabName)
+local success, launchError = pcall(function()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
+    local TweenService = game:GetService("TweenService")
+    local Lighting = game:GetService("Lighting")
+    local VirtualUser = game:GetService("VirtualUser")
+    local Workspace = game:GetService("Workspace")
+    
+    local LocalPlayer = Players.LocalPlayer
+    if not LocalPlayer then
+        Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+        LocalPlayer = Players.LocalPlayer
     end
-    for name, btn in pairs(tabButtons) do
-        btn.TextColor3 = (name == tabName) and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(150, 150, 150)
-    end
-end
+    
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
 
-local function CreateTab(name)
-    local TabButton = Instance.new("TextButton")
-    TabButton.Size = UDim2.new(1, 0, 0, 32)
-    TabButton.BackgroundTransparency = 1
-    TabButton.Text = "  " .. name
-    TabButton.TextColor3 = Color3.fromRGB(150, 150, 150)
-    TabButton.Font = Enum.Font.GothamMedium
-    TabButton.TextSize = 13
-    TabButton.TextXAlignment = Enum.TextXAlignment.Left
-    TabButton.Parent = TabBtnContainer
-    tabButtons[name] = TabButton
+    local Config = {
+        CFrameSpeed = false,
+        SpeedValue = 2.5,
+        NoFall = false,
+        Noclip = false,
+        AntiAFK = false,
+        AutoSprint = false,
+        NormalWalkSpeed = 16,
+        SprintWalkSpeed = 25,
+        ESP = false,
+        Box = false, 
+        Tracers = false,
+        Fullbright = false,
+        ObjectESP = false,
+        FOVValue = 70,
+        WallColor = false,
+        WallColorValue = Color3.fromRGB(120, 100, 255),
+        SkyColor = false,
+        SkyColorValue = Color3.fromRGB(0, 180, 255),
+        ParticleColor = false,
+        ParticleColorValue = Color3.fromRGB(255, 255, 255),
+        PerfectSkillCheck = false
+    }
 
-    local Page = Instance.new("ScrollingFrame")
-    Page.Size = UDim2.new(1, 0, 1, 0)
-    Page.BackgroundTransparency = 1
-    Page.Visible = false
-    Page.CanvasSize = UDim2.new(0, 0, 0, 350)
-    Page.ScrollBarThickness = 0
-    Page.Parent = ContentFrame
-    tabs[name] = Page
+    local connections = {}
+    local tabs = {}
+    local tabButtons = {}
+    local tracerCache = {}
+    local isSprinting = false
 
-    local PageLayout = Instance.new("UIListLayout")
-    PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    PageLayout.Padding = UDim.new(0, 6)
-    PageLayout.Parent = Page
+    local originalLighting = {
+        Ambient = Lighting.Ambient or Color3.fromRGB(0,0,0),
+        OutdoorAmbient = Lighting.OutdoorAmbient or Color3.fromRGB(0,0,0),
+        Brightness = Lighting.Brightness or 1,
+        ClockTime = Lighting.ClockTime or 12,
+        FogEnd = Lighting.FogEnd or 10000,
+        GlobalShadows = Lighting.GlobalShadows or false,
+        ColorShift_Top = Lighting.ColorShift_Top or Color3.fromRGB(0,0,0)
+    }
 
-    TabButton.MouseButton1Click:Connect(function()
-        SwitchToTab(name)
+    local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
+    Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        Camera = Workspace.CurrentCamera
     end)
 
-    return Page
-end
-
-local MainTab = CreateTab("Main")
-local VisualsTab = CreateTab("Visuals")
-local ExploitsTab = CreateTab("Exploits")
-SwitchToTab("Main")
-
-local function CreateToggle(parent, name, propName, callback, hasColor, colorPropName, colorCallback)
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -5, 0, 35)
-    Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-    Frame.BorderSizePixel = 0
-    Frame.Parent = parent
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "Luna_V4"
+    ScreenGui.ResetOnSpawn = false
     
-    local FCorn = Instance.new("UICorner")
-    FCorn.CornerRadius = UDim.new(0, 4)
-    FCorn.Parent = Frame
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -90, 1, 0)
-    Label.Position = UDim2.new(0, 10, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = name
-    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    Label.Font = Enum.Font.GothamMedium
-    Label.TextSize = 12
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Frame
-
-    local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 35, 0, 16)
-    Btn.Position = UDim2.new(1, -45, 0.5, -8)
-    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    Btn.Text = ""
-    Btn.Parent = Frame
-    
-    local BCorn = Instance.new("UICorner")
-    BCorn.CornerRadius = UDim.new(1, 0)
-    BCorn.Parent = Btn
-
-    Btn.MouseButton1Click:Connect(function()
-        Config[propName] = not Config[propName]
-        TweenService:Create(Btn, TweenInfo.new(0.15), {
-            BackgroundColor3 = Config[propName] and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(45, 45, 55)
-        }):Play()
-        if callback then callback(Config[propName]) end
-    end)
-
-    if hasColor and colorPropName then
-        local ColorBtn = Instance.new("TextButton")
-        ColorBtn.Size = UDim2.new(0, 16, 0, 16)
-        ColorBtn.Position = UDim2.new(1, -75, 0.5, -8)
-        ColorBtn.BackgroundColor3 = Config[colorPropName]
-        ColorBtn.Text = ""
-        ColorBtn.Parent = Frame
-
-        local CCorn = Instance.new("UICorner")
-        CCorn.CornerRadius = UDim.new(0, 4)
-        CCorn.Parent = ColorBtn
-
-        local Palette = Instance.new("Frame")
-        Palette.Size = UDim2.new(0, 100, 0, 50)
-        Palette.Position = UDim2.new(1, -110, 1, 2)
-        Palette.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        Palette.BorderSizePixel = 0
-        Palette.Visible = false
-        Palette.ZIndex = 10
-        Palette.Parent = Frame
-
-        local PCorn = Instance.new("UICorner")
-        PCorn.CornerRadius = UDim.new(0, 4)
-        PCorn.Parent = Palette
-
-        local PGrid = Instance.new("UIGridLayout")
-        PGrid.CellSize = UDim2.new(0, 20, 0, 20)
-        PGrid.CellPadding = UDim2.new(0, 4, 0, 4)
-        PGrid.SortOrder = Enum.SortOrder.LayoutOrder
-        PGrid.Parent = Palette
-
-        local colors = {
-            Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 0, 255),
-            Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
-            Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 100, 255)
-        }
-
-        for _, col in ipairs(colors) do
-            local Choice = Instance.new("TextButton")
-            Choice.Size = UDim2.new(0, 20, 0, 20)
-            Choice.BackgroundColor3 = col
-            Choice.Text = ""
-            Choice.ZIndex = 11
-            Choice.Parent = Palette
-
-            local ChoiceCorn = Instance.new("UICorner")
-            ChoiceCorn.CornerRadius = UDim.new(0, 3)
-            ChoiceCorn.Parent = Choice
-
-            Choice.MouseButton1Click:Connect(function()
-                Config[colorPropName] = col
-                ColorBtn.BackgroundColor3 = col
-                Palette.Visible = false
-                if colorCallback then colorCallback(col) end
-            end)
+    local coreGuiSuccess, _ = pcall(function() ScreenGui.Parent = CoreGui end)
+    if not coreGuiSuccess or not ScreenGui.Parent then 
+        if PlayerGui then 
+            ScreenGui.Parent = PlayerGui 
+        else
+            return
         end
+    end
 
-        ColorBtn.MouseButton1Click:Connect(function()
-            Palette.Visible = not Palette.Visible
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 460, 0, 300)
+    MainFrame.Position = UDim2.new(0.5, -230, 0.55, -150)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Parent = ScreenGui
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.Parent = MainFrame
+
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Size = UDim2.new(0, 120, 1, 0)
+    Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    Sidebar.BorderSizePixel = 0
+    Sidebar.Parent = MainFrame
+
+    local SidebarCorner = Instance.new("UICorner")
+    SidebarCorner.CornerRadius = UDim.new(0, 8)
+    SidebarCorner.Parent = Sidebar
+
+    local Logo = Instance.new("TextLabel")
+    Logo.Size = UDim2.new(1, 0, 0, 40)
+    Logo.BackgroundTransparency = 1
+    Logo.Text = "LUNA V4"
+    Logo.TextColor3 = Color3.fromRGB(0, 180, 255)
+    Logo.Font = Enum.Font.GothamBold
+    Logo.TextSize = 16
+    Logo.Parent = Sidebar
+
+    local TabBtnContainer = Instance.new("Frame")
+    TabBtnContainer.Size = UDim2.new(1, 0, 1, -50)
+    TabBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+    TabBtnContainer.BackgroundTransparency = 1
+    TabBtnContainer.Parent = Sidebar
+
+    local TabListLayout = Instance.new("UIListLayout")
+    TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    TabListLayout.Padding = UDim.new(0, 4)
+    TabListLayout.Parent = TabBtnContainer
+
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Size = UDim2.new(1, -130, 1, -10)
+    ContentFrame.Position = UDim2.new(0, 125, 0, 5)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.Parent = MainFrame
+
+    local function SwitchToTab(tabName)
+        for name, frame in pairs(tabs) do
+            frame.Visible = (name == tabName)
+        end
+        for name, btn in pairs(tabButtons) do
+            btn.TextColor3 = (name == tabName) and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(150, 150, 150)
+        end
+    end
+
+    local function CreateTab(name)
+        local TabButton = Instance.new("TextButton")
+        TabButton.Size = UDim2.new(1, 0, 0, 32)
+        TabButton.BackgroundTransparency = 1
+        TabButton.Text = "  " .. name
+        TabButton.TextColor3 = Color3.fromRGB(150, 150, 150)
+        TabButton.Font = Enum.Font.GothamMedium
+        TabButton.TextSize = 13
+        TabButton.TextXAlignment = Enum.TextXAlignment.Left
+        TabButton.Parent = TabBtnContainer
+        tabButtons[name] = TabButton
+
+        local Page = Instance.new("ScrollingFrame")
+        Page.Size = UDim2.new(1, 0, 1, 0)
+        Page.BackgroundTransparency = 1
+        Page.Visible = false
+        Page.CanvasSize = UDim2.new(0, 0, 0, 350)
+        Page.ScrollBarThickness = 0
+        Page.Parent = ContentFrame
+        tabs[name] = Page
+
+        local PageLayout = Instance.new("UIListLayout")
+        PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        PageLayout.Padding = UDim.new(0, 6)
+        PageLayout.Parent = Page
+
+        TabButton.MouseButton1Click:Connect(function()
+            SwitchToTab(name)
         end)
-    end
-end
 
-table.insert(connections, RunService.RenderStepped:Connect(function(dt)
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LocalPlayer.Character.HumanoidRootPart
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum and hum.MoveDirection.Magnitude > 0 then
-            if Config.CFrameSpeed then
-                local currentSpeed = Config.SpeedValue
-                if Config.AutoSprint and isSprinting then
-                    currentSpeed = Config.SpeedValue * 1.8
-                end
-                hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (currentSpeed * dt * 10))
+        return Page
+    end
+
+    local MainTab = CreateTab("Main")
+    local VisualsTab = CreateTab("Visuals")
+    local ExploitsTab = CreateTab("Exploits")
+    SwitchToTab("Main")
+
+    local function CreateToggle(parent, name, propName, callback, hasColor, colorPropName, colorCallback)
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(1, -5, 0, 35)
+        Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+        Frame.BorderSizePixel = 0
+        Frame.Parent = parent
+        
+        local FCorn = Instance.new("UICorner")
+        FCorn.CornerRadius = UDim.new(0, 4)
+        FCorn.Parent = Frame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -90, 1, 0)
+        Label.Position = UDim2.new(0, 10, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text = name
+        Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        Label.Font = Enum.Font.GothamMedium
+        Label.TextSize = 12
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.Parent = Frame
+
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.new(0, 35, 0, 16)
+        Btn.Position = UDim2.new(1, -45, 0.5, -8)
+        Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        Btn.Text = ""
+        Btn.Parent = Frame
+        
+        local BCorn = Instance.new("UICorner")
+        BCorn.CornerRadius = UDim.new(1, 0)
+        BCorn.Parent = Btn
+
+        Btn.MouseButton1Click:Connect(function()
+            Config[propName] = not Config[propName]
+            TweenService:Create(Btn, TweenInfo.new(0.15), {
+                BackgroundColor3 = Config[propName] and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(45, 45, 55)
+            }):Play()
+            if callback then callback(Config[propName]) end
+        end)
+
+        if hasColor and colorPropName then
+            local ColorBtn = Instance.new("TextButton")
+            ColorBtn.Size = UDim2.new(0, 16, 0, 16)
+            ColorBtn.Position = UDim2.new(1, -75, 0.5, -8)
+            ColorBtn.BackgroundColor3 = Config[colorPropName]
+            ColorBtn.Text = ""
+            ColorBtn.Parent = Frame
+
+            local CCorn = Instance.new("UICorner")
+            CCorn.CornerRadius = UDim.new(0, 4)
+            CCorn.Parent = ColorBtn
+
+            local Palette = Instance.new("Frame")
+            Palette.Size = UDim2.new(0, 100, 0, 50)
+            Palette.Position = UDim2.new(1, -110, 1, 2)
+            Palette.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+            Palette.BorderSizePixel = 0
+            Palette.ZIndex = 10
+            Palette.Parent = Frame
+
+            local PCorn = Instance.new("UICorner")
+            PCorn.CornerRadius = UDim.new(0, 4)
+            PCorn.Parent = Palette
+
+            local PGrid = Instance.new("UIGridLayout")
+            PGrid.CellSize = UDim2.new(0, 20, 0, 20)
+            PGrid.CellPadding = UDim2.new(0, 4, 0, 4)
+            PGrid.SortOrder = Enum.SortOrder.LayoutOrder
+            PGrid.Parent = Palette
+
+            local colors = {
+                Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 0, 255),
+                Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
+                Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 100, 255)
+            }
+
+            for _, col in ipairs(colors) do
+                local Choice = Instance.new("TextButton")
+                Choice.Size = UDim2.new(0, 20, 0, 20)
+                Choice.BackgroundColor3 = col
+                Choice.Text = ""
+                Choice.ZIndex = 11
+                Choice.Parent = Palette
+
+                local ChoiceCorn = Instance.new("UICorner")
+                ChoiceCorn.CornerRadius = UDim.new(0, 3)
+                ChoiceCorn.Parent = Choice
+
+                Choice.MouseButton1Click:Connect(function()
+                    Config[colorPropName] = col
+                    ColorBtn.BackgroundColor3 = col
+                    Palette.Visible = false
+                    if colorCallback then colorCallback(col) end
+                end)
             end
-        end
-    end
-end))
 
-table.insert(connections, RunService.RenderStepped:Connect(function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if Config.NoFall and hum:GetState() == Enum.HumanoidStateType.Freefall then
-            hum:ChangeState(Enum.HumanoidStateType.Running)
-        end
-        if not Config.CFrameSpeed and Config.AutoSprint then
-            if isSprinting and hum.WalkSpeed ~= Config.SprintWalkSpeed then
-                hum.WalkSpeed = Config.SprintWalkSpeed
-            elseif not isSprinting and hum.WalkSpeed == Config.SprintWalkSpeed then
-                hum.WalkSpeed = Config.NormalWalkSpeed
-            end
-        end
-    end
-end))
-
-table.insert(connections, RunService.Stepped:Connect(function()
-    if Config.Noclip and LocalPlayer.Character then
-        for _, part in ipairs(LocalPlayer.Character:GetChildren()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
-        end
-    end
-end))
-
-local antiAfkConnection
-local function toggleAntiAFK(state)
-    if state then
-        if not antiAfkConnection then
-            antiAfkConnection = LocalPlayer.Idled:Connect(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new(0,0))
+            ColorBtn.MouseButton1Click:Connect(function()
+                Palette.Visible = not Palette.Visible
             end)
         end
-    else
-        if antiAfkConnection then
-            antiAfkConnection:Disconnect()
-            antiAfkConnection = nil
-        end
     end
-end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
-        isSprinting = true
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
-        isSprinting = false
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+    table.insert(connections, RunService.RenderStepped:Connect(function(dt)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LocalPlayer.Character.HumanoidRootPart
             local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if not Config.CFrameSpeed and hum.WalkSpeed == Config.SprintWalkSpeed then
-                hum.WalkSpeed = Config.NormalWalkSpeed
+            if hum and hum.MoveDirection.Magnitude > 0 then
+                if Config.CFrameSpeed then
+                    local currentSpeed = Config.SpeedValue
+                    if Config.AutoSprint and isSprinting then
+                        currentSpeed = Config.SpeedValue * 1.8
+                    end
+                    hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (currentSpeed * dt * 10))
+                end
             end
-        end
-    end
-end)
-
-CreateToggle(MainTab, "Кастомный Speedhack (CFrame)", "CFrameSpeed")
-CreateToggle(MainTab, "Авто спринт (Shift)", "AutoSprint")
-CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
-CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
-CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
-
-local function updateFOV()
-    table.insert(connections, RunService.RenderStepped:Connect(function()
-        if Camera.FieldOfView ~= Config.FOVValue then
-            Camera.FieldOfView = Config.FOVValue
         end
     end))
-end
 
-local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(1, -5, 0, 35)
-FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-FOVFrame.BorderSizePixel = 0
-FOVFrame.Parent = VisualsTab
+    table.insert(connections, RunService.RenderStepped:Connect(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if Config.NoFall and hum:GetState() == Enum.HumanoidStateType.Freefall then
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+            end
+            if not Config.CFrameSpeed and Config.AutoSprint then
+                if isSprinting and hum.WalkSpeed ~= Config.SprintWalkSpeed then
+                    hum.WalkSpeed = Config.SprintWalkSpeed
+                elseif not isSprinting and hum.WalkSpeed == Config.SprintWalkSpeed then
+                    hum.WalkSpeed = Config.NormalWalkSpeed
+                end
+            end
+        end
+    end))
 
-local FOVLabel = Instance.new("TextLabel")
-FOVLabel.Size = UDim2.new(0, 100, 1, 0)
-FOVLabel.Position = UDim2.new(0, 10, 0, 0)
-FOVLabel.BackgroundTransparency = 1
-FOVLabel.Text = "Режим обзора (FOV)"
-FOVLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-FOVLabel.Font = Enum.Font.GothamMedium
-FOVLabel.TextSize = 12
-FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
-FOVLabel.Parent = FOVFrame
+    table.insert(connections, RunService.Stepped:Connect(function()
+        if Config.Noclip and LocalPlayer.Character then
+            for _, part in ipairs(LocalPlayer.Character:GetChildren()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+    end))
 
-local FOVBtn = Instance.new("TextButton")
-FOVBtn.Size = UDim2.new(0, 60, 0, 20)
-FOVBtn.Position = UDim2.new(1, -70, 0.5, -10)
-FOVBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-FOVBtn.Text = "90 FOV"
-FOVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FOVBtn.Font = Enum.Font.GothamBold
-FOVBtn.TextSize = 11
-FOVBtn.Parent = FOVFrame
-local FBCorn = Instance.new("UICorner")
-FBCorn.CornerRadius = UDim.new(0, 4)
-FBCorn.Parent = FOVBtn
-
-FOVBtn.MouseButton1Click:Connect(function()
-    if Config.FOVValue == 70 then
-        Config.FOVValue = 95
-        FOVBtn.Text = "95 FOV"
-    elseif Config.FOVValue == 95 then
-        Config.FOVValue = 110
-        FOVBtn.Text = "110 FOV"
-    else
-        Config.FOVValue = 70
-        FOVBtn.Text = "70 Default"
+    local antiAfkConnection
+    local function toggleAntiAFK(state)
+        if state then
+            if not antiAfkConnection then
+                antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                    pcall(function()
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton2(Vector2.new(0,0))
+                    end)
+                end)
+            end
+        else
+            if antiAfkConnection then
+                antiAfkConnection:Disconnect()
+                antiAfkConnection = nil
+            end
+        end
     end
-end)
-updateFOV()
 
-local function applyWallMod(state)
-    if state then
-        Lighting.Ambient = Config.WallColorValue
-    else
-        Lighting.Ambient = originalLighting.Ambient
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+            isSprinting = true
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+            isSprinting = false
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if not Config.CFrameSpeed and hum.WalkSpeed == Config.SprintWalkSpeed then
+                    hum.WalkSpeed = Config.NormalWalkSpeed
+                end
+            end
+        end
+    end)
+
+    CreateToggle(MainTab, "Кастомный Speedhack (CFrame)", "CFrameSpeed")
+    CreateToggle(MainTab, "Авто спринт (Shift)", "AutoSprint")
+    CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
+    CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
+    CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
+
+    local function updateFOV()
+        table.insert(connections, RunService.RenderStepped:Connect(function()
+            if Camera and Camera.FieldOfView ~= Config.FOVValue then
+                Camera.FieldOfView = Config.FOVValue
+            end
+        end))
     end
-end
 
-local function applySkyMod(state)
-    if state then
-        Lighting.OutdoorAmbient = Config.SkyColorValue
-        Lighting.ColorShift_Top = Config.SkyColorValue
-        Lighting.FogColor = Config.SkyColorValue
-    else
-        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-        Lighting.ColorShift_Top = originalLighting.ColorShift_Top
-        Lighting.FogColor = Color3.fromRGB(128, 128, 128)
+    local FOVFrame = Instance.new("Frame")
+    FOVFrame.Size = UDim2.new(1, -5, 0, 35)
+    FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    FOVFrame.BorderSizePixel = 0
+    FOVFrame.Parent = VisualsTab
+
+    local FOVLabel = Instance.new("TextLabel")
+    FOVLabel.Size = UDim2.new(0, 100, 1, 0)
+    FOVLabel.Position = UDim2.new(0, 10, 0, 0)
+    FOVLabel.BackgroundTransparency = 1
+    FOVLabel.Text = "Режим обзора (FOV)"
+    FOVLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    FOVLabel.Font = Enum.Font.GothamMedium
+    FOVLabel.TextSize = 12
+    FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
+    FOVLabel.Parent = FOVFrame
+
+    local FOVBtn = Instance.new("TextButton")
+    FOVBtn.Size = UDim2.new(0, 60, 0, 20)
+    FOVBtn.Position = UDim2.new(1, -70, 0.5, -10)
+    FOVBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    FOVBtn.Text = "90 FOV"
+    FOVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FOVBtn.Font = Enum.Font.GothamBold
+    FOVBtn.TextSize = 11
+    FOVBtn.Parent = FOVFrame
+    local FBCorn = Instance.new("UICorner")
+    FBCorn.CornerRadius = UDim.new(0, 4)
+    FBCorn.Parent = FOVBtn
+
+    FOVBtn.MouseButton1Click:Connect(function()
+        if Config.FOVValue == 70 then
+            Config.FOVValue = 95
+            FOVBtn.Text = "95 FOV"
+        elseif Config.FOVValue == 95 then
+            Config.FOVValue = 110
+            FOVBtn.Text = "110 FOV"
+        else
+            Config.FOVValue = 70
+            FOVBtn.Text = "70 Default"
+        end
+    end)
+    updateFOV()
+
+    local function applyWallMod(state)
+        if state then
+            Lighting.Ambient = Config.WallColorValue
+        else
+            Lighting.Ambient = originalLighting.Ambient
+        end
     end
-end
 
-local function updateParticles()
-    if Config.ParticleColor then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("ParticleEmitter") then
-                local name = obj.Name:lower()
-                if name:find("geometric") or name:find("snow") or name:find("particle") then
-                    obj.Color = ColorSequence.new(Config.ParticleColorValue)
+    local function applySkyMod(state)
+        if state then
+            Lighting.OutdoorAmbient = Config.SkyColorValue
+            Lighting.ColorShift_Top = Config.SkyColorValue
+            Lighting.FogColor = Config.SkyColorValue
+        else
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
+            Lighting.FogColor = Color3.fromRGB(128, 128, 128)
+        end
+    end
+
+    local function updateParticles()
+        if Config.ParticleColor then
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") then
+                    local name = obj.Name:lower()
+                    if name:find("geometric") or name:find("snow") or name:find("particle") then
+                        obj.Color = ColorSequence.new(Config.ParticleColorValue)
+                    end
                 end
             end
         end
     end
-end
 
-task.spawn(function()
-    while task.wait(1) do
-        updateParticles()
-    end
-end)
+    task.spawn(function()
+        while task.wait(1) do
+            updateParticles()
+        end
+    end)
 
-table.insert(connections, RunService.RenderStepped:Connect(function()
-    if Config.Fullbright then
-        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-        Lighting.Brightness = 3
-        Lighting.ClockTime = 14
-        Lighting.FogEnd = 999999
-        Lighting.GlobalShadows = false
-    end
-end))
+    table.insert(connections, RunService.RenderStepped:Connect(function()
+        if Config.Fullbright then
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 3
+            Lighting.ClockTime = 14
+            Lighting.FogEnd = 999999
+            Lighting.GlobalShadows = false
+        end
+    end))
 
-local function toggleFullbright(state)
-    if not state then
-        Lighting.Ambient = originalLighting.Ambient
-        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-        Lighting.Brightness = originalLighting.Brightness
-        Lighting.ClockTime = originalLighting.ClockTime
-        Lighting.FogEnd = originalLighting.FogEnd
-        Lighting.GlobalShadows = originalLighting.GlobalShadows
-    end
-end
-
-local function checkIsKiller(player, character)
-    if not player then return false end
-    if player.Team then
-        local tName = player.Team.Name:lower()
-        if tName:find("kill") or tName:find("slash") or tName:find("beast") or tName:find("murder") or tName:find("hunter") then
-            return true
+    local function toggleFullbright(state)
+        if not state then
+            Lighting.Ambient = originalLighting.Ambient
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+            Lighting.Brightness = originalLighting.Brightness
+            Lighting.ClockTime = originalLighting.ClockTime
+            Lighting.FogEnd = originalLighting.FogEnd
+            Lighting.GlobalShadows = originalLighting.GlobalShadows
         end
     end
-    if player:GetAttribute("Role") == "Killer" or player:GetAttribute("IsKiller") == true then return true end
-    if character and (character:GetAttribute("Role") == "Killer" or character:GetAttribute("IsKiller") == true) then return true end
-    
-    local function scansForWeapons(container)
-        if not container then return false end
-        for _, item in ipairs(container:GetChildren()) do
-            if item:IsA("Tool") then
-                local iName = item.Name:lower()
-                if not iName:find("flashlight") and not iName:find("medkit") and not iName:find("cola") and not iName:find("camera") then
-                    return true
-                end
+
+    local function checkIsKiller(player, character)
+        if not player then return false end
+        if player.Team then
+            local tName = player.Team.Name:lower()
+            if tName:find("kill") or tName:find("slash") or tName:find("beast") or tName:find("murder") or tName:find("hunter") then
+                return true
             end
         end
+        if player:GetAttribute("Role") == "Killer" or player:GetAttribute("IsKiller") == true then return true end
+        if character and (character:GetAttribute("Role") == "Killer" or character:GetAttribute("IsKiller") == true) then return true end
+        
+        local function scansForWeapons(container)
+            if not container then return false end
+            for _, item in ipairs(container:GetChildren()) do
+                if item:IsA("Tool") then
+                    local iName = item.Name:lower()
+                    if not iName:find("flashlight") and not iName:find("medkit") and not iName:find("cola") and not iName:find("camera") then
+                        return true
+                    end
+                end
+            end
+            return false
+        end
+        if character and scansForWeapons(character) then return true end
+        if player:FindFirstChild("Backpack") and scansForWeapons(player.Backpack) then return true end
         return false
     end
-    if character and scansForWeapons(character) then return true end
-    if player:FindFirstChild("Backpack") and scansForWeapons(player.Backpack) then return true end
-    return false
-end
 
-task.spawn(function()
-    while task.wait(0.1) do
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local character = player.Character
-                if character and character:FindFirstChild("HumanoidRootPart") then
-                    
-                    local folder = character:FindFirstChild("Luna_Visuals_Container")
-                    if not folder then
-                        folder = Instance.new("Folder")
-                        folder.Name = "Luna_Visuals_Container"
-                        folder.Parent = character
-                    end
-                    
-                    local isKiller = checkIsKiller(player, character)
-                    local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
-                    local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
-                    
-                    local textESP = folder:FindFirstChild("Luna_Text")
-                    if Config.ESP then
-                        if not textESP then
-                            textESP = Instance.new("BillboardGui")
-                            textESP.Name = "Luna_Text"
-                            textESP.Size = UDim2.new(0, 160, 0, 40)
-                            textESP.AlwaysOnTop = true
-                            local label = Instance.new("TextLabel")
-                            label.Name = "Label"
-                            label.Size = UDim2.new(1, 0, 1, 0)
-                            label.BackgroundTransparency = 1
-                            label.Font = Enum.Font.GothamBold
-                            label.TextSize = 12
-                            label.TextStrokeTransparency = 0
-                            label.Parent = textESP
-                            textESP.Parent = folder
+    task.spawn(function()
+        while task.wait(0.1) do
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    local character = player.Character
+                    if character and character:FindFirstChild("HumanoidRootPart") then
+                        
+                        local folder = character:FindFirstChild("Luna_Visuals_Container")
+                        if not folder then
+                            folder = Instance.new("Folder")
+                            folder.Name = "Luna_Visuals_Container"
+                            folder.Parent = character
                         end
-                        textESP.Adornee = character.HumanoidRootPart
-                        textESP.Label.Text = currentText .. "\n" .. player.DisplayName
-                        textESP.Label.TextColor3 = currentColor
-                    else
-                        if textESP then textESP:Destroy() end
-                    end
-                    
-                    local boxESP = folder:FindFirstChild("Luna_Highlight")
-                    if Config.Box then
-                        if not boxESP then
-                            boxESP = Instance.new("Highlight")
-                            boxESP.Name = "Luna_Highlight"
-                            boxESP.FillTransparency = 1
-                            boxESP.OutlineTransparency = 0
-                            boxESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                            boxESP.Parent = folder
-                        end
-                        boxESP.Adornee = character
-                        boxESP.OutlineColor = currentColor
-                    else
-                        if boxESP then boxESP:Destroy() end
-                    end
-                    
-                end
-            end
-        end
-    end
-end)
-
-table.insert(connections, RunService.RenderStepped:Connect(function()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local character = player.Character
-            local root = character and character:FindFirstChild("HumanoidRootPart")
-            
-        
+                        
+                        local isKiller = checkIsKiller(player, character)
+                        local currentColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
+                        local currentText = isKiller and "[ МАНЬЯК ]" or "[ Выживший ]"
+               
