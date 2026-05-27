@@ -17,52 +17,44 @@ local success, launchError = pcall(function()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
 
     local Config = {
-        CFrameSpeed    = false,
-        SpeedValue     = 2.5,
-        NoFall         = false,
-        Noclip         = false,
-        AntiAFK        = false,
-        AutoSprint     = false,
+        CFrameSpeed = false,
+        SpeedValue = 2.5,
+        NoFall = false,
+        Noclip = false,
+        AntiAFK = false,
+        AutoSprint = false,
         NormalWalkSpeed = 16,
         SprintWalkSpeed = 25,
-        ESP            = false,
-        Box            = false,
-        Tracers        = false,
-        Fullbright     = false,
-        ObjectESP      = false,
-        FOVValue       = 70,
-        WallColor      = false,
+        ESP = false,
+        Box = false,
+        Tracers = false,
+        Fullbright = false,
+        ObjectESP = false,
+        FOVValue = 70,
+        WallColor = false,
         WallColorValue = Color3.fromRGB(120, 100, 255),
-        SkyColor       = false,
-        SkyColorValue  = Color3.fromRGB(0, 180, 255),
-        ParticleColor  = false,
-        ParticleColorValue = Color3.fromRGB(255, 255, 255),
+        ParticleColor = false,
         PerfectSkillCheck = false
     }
 
-    local connections   = {}
-    local tabs          = {}
-    local tabButtons    = {}
-    local isSprinting   = false
+    local connections = {}
+    local tabs = {}
+    local tabButtons = {}
+    local isSprinting = false
 
-    -- FIX: сохраняем оригинальный FogColor
     local originalLighting = {
-        Ambient        = Lighting.Ambient,
+        Ambient = Lighting.Ambient,
         OutdoorAmbient = Lighting.OutdoorAmbient,
-        Brightness     = Lighting.Brightness,
-        ClockTime      = Lighting.ClockTime,
-        FogEnd         = Lighting.FogEnd,
-        FogColor       = Lighting.FogColor,
-        GlobalShadows  = Lighting.GlobalShadows,
-        ColorShift_Top = Lighting.ColorShift_Top
+        Brightness = Lighting.Brightness,
+        ClockTime = Lighting.ClockTime,
+        FogEnd = Lighting.FogEnd,
+        GlobalShadows = Lighting.GlobalShadows
     }
 
     local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
     Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
         Camera = Workspace.CurrentCamera
     end)
-
-    -- ── GUI ─────────────────────────────────────────────────────────────────
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "Luna_V4"
@@ -80,21 +72,20 @@ local success, launchError = pcall(function()
     MainFrame.Position = UDim2.new(0.5, -230, 0.5, -150)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
+    MainFrame.ClipsDescendants = false
     MainFrame.Parent = ScreenGui
 
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = MainFrame
 
-    -- FIX: drag окна
     do
         local dragging, dragStart, startPos
         MainFrame.InputBegan:Connect(function(inp)
             if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging  = true
+                dragging = true
                 dragStart = inp.Position
-                startPos  = MainFrame.Position
+                startPos = MainFrame.Position
             end
         end)
         MainFrame.InputEnded:Connect(function(inp)
@@ -149,8 +140,6 @@ local success, launchError = pcall(function()
     ContentFrame.BackgroundTransparency = 1
     ContentFrame.Parent = MainFrame
 
-    -- ── Tabs ────────────────────────────────────────────────────────────────
-
     local function SwitchToTab(tabName)
         for name, frame in pairs(tabs) do
             frame.Visible = (name == tabName)
@@ -158,7 +147,7 @@ local success, launchError = pcall(function()
         for name, btn in pairs(tabButtons) do
             btn.TextColor3 = (name == tabName)
                 and Color3.fromRGB(0, 180, 255)
-                or  Color3.fromRGB(150, 150, 150)
+                or Color3.fromRGB(150, 150, 150)
         end
     end
 
@@ -178,7 +167,7 @@ local success, launchError = pcall(function()
         Page.Size = UDim2.new(1, 0, 1, 0)
         Page.BackgroundTransparency = 1
         Page.Visible = false
-        Page.CanvasSize = UDim2.new(0, 0, 0, 0) -- FIX: авторазмер
+        Page.CanvasSize = UDim2.new(0, 0, 0, 0)
         Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
         Page.ScrollBarThickness = 3
         Page.ScrollBarImageColor3 = Color3.fromRGB(0, 180, 255)
@@ -201,12 +190,10 @@ local success, launchError = pcall(function()
         return Page
     end
 
-    local MainTab    = CreateTab("Main")
+    local MainTab = CreateTab("Main")
     local VisualsTab = CreateTab("Visuals")
     local ExploitsTab = CreateTab("Exploits")
     SwitchToTab("Main")
-
-    -- ── Компоненты ──────────────────────────────────────────────────────────
 
     local function CreateToggle(parent, labelText, propName, callback, hasColor, colorPropName, colorCallback)
         local Frame = Instance.new("Frame")
@@ -246,12 +233,11 @@ local success, launchError = pcall(function()
             TweenService:Create(Btn, TweenInfo.new(0.15), {
                 BackgroundColor3 = Config[propName]
                     and Color3.fromRGB(0, 180, 255)
-                    or  Color3.fromRGB(45, 45, 55)
+                    or Color3.fromRGB(45, 45, 55)
             }):Play()
             if callback then callback(Config[propName]) end
         end)
 
-        -- FIX: Palette.Visible = false по умолчанию
         if hasColor and colorPropName then
             local ColorBtn = Instance.new("TextButton")
             ColorBtn.Size = UDim2.new(0, 16, 0, 16)
@@ -266,12 +252,10 @@ local success, launchError = pcall(function()
 
             local Palette = Instance.new("Frame")
             Palette.Size = UDim2.new(0, 100, 0, 56)
-            Palette.Position = UDim2.new(1, -110, 1, 2)
             Palette.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
             Palette.BorderSizePixel = 0
             Palette.ZIndex = 10
-            Palette.Visible = false  -- FIX
-            Palette.Parent = Frame
+            Palette.Visible = false
 
             local PCorn = Instance.new("UICorner")
             PCorn.CornerRadius = UDim.new(0, 4)
@@ -284,14 +268,14 @@ local success, launchError = pcall(function()
             PGrid.Parent = Palette
 
             local PPad = Instance.new("UIPadding")
-            PPad.PaddingLeft   = UDim.new(0, 4)
-            PPad.PaddingTop    = UDim.new(0, 4)
+            PPad.PaddingLeft = UDim.new(0, 4)
+            PPad.PaddingTop = UDim.new(0, 4)
             PPad.Parent = Palette
 
             local colors = {
-                Color3.fromRGB(255,   0,   0), Color3.fromRGB(  0, 255,   0),
-                Color3.fromRGB(  0,   0, 255), Color3.fromRGB(255, 255,   0),
-                Color3.fromRGB(255,   0, 255), Color3.fromRGB(  0, 255, 255),
+                Color3.fromRGB(255, 0, 0), Color3.fromRGB(0, 255, 0),
+                Color3.fromRGB(0, 0, 255), Color3.fromRGB(255, 255, 0),
+                Color3.fromRGB(255, 0, 255), Color3.fromRGB(0, 255, 255),
                 Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 100, 255)
             }
             for _, col in ipairs(colors) do
@@ -316,13 +300,14 @@ local success, launchError = pcall(function()
 
             ColorBtn.MouseButton1Click:Connect(function()
                 Palette.Visible = not Palette.Visible
+                if Palette.Visible then
+                    Palette.Parent = ScreenGui
+                    Palette.Position = UDim2.new(0, ColorBtn.AbsolutePosition.X + 25, 0, ColorBtn.AbsolutePosition.Y)
+                end
             end)
         end
     end
 
-    -- ── RenderStepped / Stepped коннекты ────────────────────────────────────
-
-    -- Speed (CFrame)
     table.insert(connections, RunService.RenderStepped:Connect(function(dt)
         if not LocalPlayer.Character then return end
         local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -334,7 +319,6 @@ local success, launchError = pcall(function()
         end
     end))
 
-    -- NoFall + AutoSprint WalkSpeed
     table.insert(connections, RunService.RenderStepped:Connect(function()
         if not LocalPlayer.Character then return end
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -353,7 +337,6 @@ local success, launchError = pcall(function()
         end
     end))
 
-    -- Noclip
     table.insert(connections, RunService.Stepped:Connect(function()
         if Config.Noclip and LocalPlayer.Character then
             for _, part in ipairs(LocalPlayer.Character:GetChildren()) do
@@ -362,26 +345,22 @@ local success, launchError = pcall(function()
         end
     end))
 
-    -- FIX: один FOV коннект (не создавать внутри функции каждый раз)
     table.insert(connections, RunService.RenderStepped:Connect(function()
         if Camera and Camera.FieldOfView ~= Config.FOVValue then
             Camera.FieldOfView = Config.FOVValue
         end
     end))
 
-    -- Fullbright
     table.insert(connections, RunService.RenderStepped:Connect(function()
         if Config.Fullbright then
-            Lighting.Ambient        = Color3.fromRGB(255, 255, 255)
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
             Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-            Lighting.Brightness     = 3
-            Lighting.ClockTime      = 14
-            Lighting.FogEnd         = 999999
-            Lighting.GlobalShadows  = false
+            Lighting.Brightness = 3
+            Lighting.ClockTime = 14
+            Lighting.FogEnd = 999999
+            Lighting.GlobalShadows = false
         end
     end))
-
-    -- ── AntiAFK ─────────────────────────────────────────────────────────────
 
     local antiAfkConnection
     local function toggleAntiAFK(state)
@@ -402,21 +381,16 @@ local success, launchError = pcall(function()
         end
     end
 
-    -- ── Fullbright restore ──────────────────────────────────────────────────
-
     local function toggleFullbright(state)
         if not state then
-            Lighting.Ambient        = originalLighting.Ambient
+            Lighting.Ambient = originalLighting.Ambient
             Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-            Lighting.Brightness     = originalLighting.Brightness
-            Lighting.ClockTime      = originalLighting.ClockTime
-            Lighting.FogEnd         = originalLighting.FogEnd
-            Lighting.GlobalShadows  = originalLighting.GlobalShadows
-            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
+            Lighting.Brightness = originalLighting.Brightness
+            Lighting.ClockTime = originalLighting.ClockTime
+            Lighting.FogEnd = originalLighting.FogEnd
+            Lighting.GlobalShadows = originalLighting.GlobalShadows
         end
     end
-
-    -- ── Sprint ──────────────────────────────────────────────────────────────
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -437,8 +411,6 @@ local success, launchError = pcall(function()
         end
     end)
 
-    -- ── Wall / Sky / Particle modifiers ────────────────────────────────────
-
     local function applyWallMod(state)
         if state then
             Lighting.Ambient = Config.WallColorValue
@@ -447,26 +419,13 @@ local success, launchError = pcall(function()
         end
     end
 
-    local function applySkyMod(state)
-        if state then
-            Lighting.OutdoorAmbient = Config.SkyColorValue
-            Lighting.ColorShift_Top = Config.SkyColorValue
-            Lighting.FogColor       = Config.SkyColorValue
-        else
-            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
-            Lighting.FogColor       = originalLighting.FogColor  -- FIX: восстанавливаем оригинал
-        end
-    end
-
-    -- FIX: scansForWeapons вынесена наружу цикла (не создавать заново каждую итерацию)
     local function scansForWeapons(container)
         if not container then return false end
         for _, item in ipairs(container:GetChildren()) do
             if item:IsA("Tool") then
                 local iName = item.Name:lower()
                 if not iName:find("flashlight") and not iName:find("medkit")
-                   and not iName:find("cola")      and not iName:find("camera") then
+                   and not iName:find("cola") and not iName:find("camera") then
                     return true
                 end
             end
@@ -495,8 +454,6 @@ local success, launchError = pcall(function()
         return false
     end
 
-    -- ── ESP Billboard ────────────────────────────────────────────────────────
-
     local function getOrCreateBillboard(character, color, labelText)
         local folder = character:FindFirstChild("Luna_Visuals_Container")
         if not folder then
@@ -508,7 +465,6 @@ local success, launchError = pcall(function()
         local hrp = character:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        -- Name ESP
         local bb = folder:FindFirstChild("LunaBB")
         if Config.ESP then
             if not bb then
@@ -522,7 +478,7 @@ local success, launchError = pcall(function()
 
                 local tl = Instance.new("TextLabel")
                 tl.Name = "NameLabel"
-                tl.Size = UDim2.new(1, 0, 1,0)
+                tl.Size = UDim2.new(1, 0, 1, 0)
                 tl.BackgroundTransparency = 1
                 tl.Font = Enum.Font.GothamBold
                 tl.TextSize = 13
@@ -538,7 +494,6 @@ local success, launchError = pcall(function()
             if bb then bb:Destroy() end
         end
 
-        -- Box ESP
         local sel = folder:FindFirstChild("LunaBox")
         if Config.Box then
             if not sel then
@@ -555,7 +510,6 @@ local success, launchError = pcall(function()
             if sel then sel:Destroy() end
         end
 
-        -- Tracer (line from bottom of screen to character)
         local tracerGui = ScreenGui:FindFirstChild("TracerFrame")
         if Config.Tracers then
             if not tracerGui then
@@ -568,8 +522,6 @@ local success, launchError = pcall(function()
         end
     end
 
-    -- ── ESP обновление ──────────────────────────────────────────────────────
-
     task.spawn(function()
         while task.wait(0.1) do
             for _, player in ipairs(Players:GetPlayers()) do
@@ -579,16 +531,15 @@ local success, launchError = pcall(function()
                 local hrp = character:FindFirstChild("HumanoidRootPart")
                 if not hrp then continue end
 
-                local isKiller   = checkIsKiller(player, character)
-                local espColor   = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
-                local espText    = isKiller
+                local isKiller = checkIsKiller(player, character)
+                local espColor = isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120)
+                local espText = isKiller
                     and ("[ МАНЬЯК ] " .. player.Name)
-                    or  ("[ Выживший ] " .. player.Name)
+                    or ("[ Выживший ] " .. player.Name)
 
                 getOrCreateBillboard(character, espColor, espText)
             end
 
-            -- Удаляем визуалы у вышедших игроков
             for _, child in ipairs(Workspace:GetChildren()) do
                 local folder = child:FindFirstChild("Luna_Visuals_Container")
                 if folder then
@@ -602,12 +553,9 @@ local success, launchError = pcall(function()
         end
     end)
 
-    -- ── Tracer рендер ───────────────────────────────────────────────────────
-
     table.insert(connections, RunService.RenderStepped:Connect(function()
         local tf = ScreenGui:FindFirstChild("TracerFrame")
         if not tf then return end
-        -- Очищаем старые линии
         for _, c in ipairs(tf:GetChildren()) do c:Destroy() end
         if not Config.Tracers then return end
 
@@ -628,55 +576,60 @@ local success, launchError = pcall(function()
             local lineColor = isKiller and Color3.fromRGB(255, 60, 60) or Color3.fromRGB(0, 255, 120)
 
             local target = Vector2.new(screenPos.X, screenPos.Y)
-            local delta  = target - origin
+            local delta = target - origin
             local length = delta.Magnitude
-            local angle  = math.atan2(delta.Y, delta.X)
+            local angle = math.atan2(delta.Y, delta.X)
 
             local line = Instance.new("Frame")
             line.BackgroundColor3 = lineColor
-            line.BorderSizePixel  = 0
-            line.AnchorPoint      = Vector2.new(0, 0.5)
-            line.Position         = UDim2.new(0, origin.X, 0, origin.Y)
-            line.Size             = UDim2.new(0, length, 0, 1)
-            line.Rotation         = math.deg(angle)
-            line.Parent           = tf
+            line.BorderSizePixel = 0
+            line.AnchorPoint = Vector2.new(0, 0.5)
+            line.Position = UDim2.new(0, origin.X, 0, origin.Y)
+            line.Size = UDim2.new(0, length, 0, 1)
+            line.Rotation = math.deg(angle)
+            line.Parent = tf
         end
     end))
 
-    -- ── Particles ───────────────────────────────────────────────────────────
-
     task.spawn(function()
-        while task.wait(1) do
-            if Config.ParticleColor then
-                for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if obj:IsA("ParticleEmitter") then
-                        local n = obj.Name:lower()
-                        if n:find("geometric") or n:find("snow") or n:find("particle") then
-                            obj.Color = ColorSequence.new(Config.ParticleColorValue)
-                        end
+        while task.wait(0.5) do
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local existingSnow = hrp:FindFirstChild("LunaSnowEmitter")
+                if Config.ParticleColor then
+                    if not existingSnow then
+                        local a = Instance.new("Attachment", hrp)
+                        a.Name = "LunaSnowEmitter"
+                        a.Position = Vector3.new(0, 10, 0)
+                        local pe = Instance.new("ParticleEmitter", a)
+                        pe.Texture = "rbxassetid://243660364"
+                        pe.Rate = 50
+                        pe.Lifetime = NumberRange.new(2, 4)
+                        pe.Speed = NumberRange.new(5, 10)
+                        pe.EmissionDirection = Enum.NormalId.Bottom
+                        pe.SpreadAngle = Vector2.new(180, 180)
+                    end
+                else
+                    if existingSnow then
+                        existingSnow:Destroy()
                     end
                 end
             end
         end
     end)
 
-    -- ── Perfect Skill Check ─────────────────────────────────────────────────
-    -- Авто-нажатие в момент появления SkillCheck (совместимо с большинством DBD-копий)
-
     task.spawn(function()
         while task.wait(0.05) do
             if not Config.PerfectSkillCheck then continue end
-            -- Ищем SkillCheck UI в PlayerGui
             local pgui = LocalPlayer:FindFirstChild("PlayerGui")
             if not pgui then continue end
             for _, sg in ipairs(pgui:GetChildren()) do
-                -- Типичные имена в DBD-копиях
                 local function findSkillCheck(obj)
                     for _, child in ipairs(obj:GetDescendants()) do
                         local n = child.Name:lower()
                         if n:find("skillcheck") or n:find("skill_check") or n:find("greatzone") then
                             if child:IsA("Frame") and child.Visible then
-                                -- Симулируем нажатие пробела
                                 local vInput = Instance.new("InputObject")
                                 vInput.KeyCode = Enum.KeyCode.Space
                                 vInput.UserInputType = Enum.UserInputType.Keyboard
@@ -690,15 +643,11 @@ local success, launchError = pcall(function()
         end
     end)
 
-    -- ── Main Tab ────────────────────────────────────────────────────────────
-
     CreateToggle(MainTab, "Speedhack (CFrame)", "CFrameSpeed")
     CreateToggle(MainTab, "Авто спринт (Shift)", "AutoSprint")
     CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
     CreateToggle(MainTab, "No Fall (Анти-падение)", "NoFall")
     CreateToggle(MainTab, "Anti-AFK (Защита от кика)", "AntiAFK", toggleAntiAFK)
-
-    -- ── Visuals Tab ─────────────────────────────────────────────────────────
 
     CreateToggle(VisualsTab, "ESP (Имена игроков)", "ESP")
     CreateToggle(VisualsTab, "Box ESP (Рамки)", "Box")
@@ -709,15 +658,8 @@ local success, launchError = pcall(function()
             Config.WallColorValue = col
             if Config.WallColor then applyWallMod(true) end
         end)
-    CreateToggle(VisualsTab, "Цвет неба", "SkyColor", applySkyMod,
-        true, "SkyColorValue", function(col)
-            Config.SkyColorValue = col
-            if Config.SkyColor then applySkyMod(true) end
-        end)
-    CreateToggle(VisualsTab, "Цвет частиц", "ParticleColor", nil,
-        true, "ParticleColorValue", nil)
+    CreateToggle(VisualsTab, "Снег (Частицы)", "ParticleColor", nil, false, nil, nil)
 
-    -- FOV кнопка
     do
         local FOVFrame = Instance.new("Frame")
         FOVFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -725,7 +667,7 @@ local success, launchError = pcall(function()
         FOVFrame.BorderSizePixel = 0
         FOVFrame.Parent = VisualsTab
 
-        local FOVCorn = Instance.new("UICorner") -- FIX: добавлен corner
+        local FOVCorn = Instance.new("UICorner")
         FOVCorn.CornerRadius = UDim.new(0, 4)
         FOVCorn.Parent = FOVFrame
 
@@ -744,7 +686,7 @@ local success, launchError = pcall(function()
         FOVBtn.Size = UDim2.new(0, 75, 0, 20)
         FOVBtn.Position = UDim2.new(1, -83, 0.5, -10)
         FOVBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-        FOVBtn.Text = "70 (Default)" -- FIX: соответствует FOVValue=70
+        FOVBtn.Text = "70 (Default)"
         FOVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         FOVBtn.Font = Enum.Font.GothamBold
         FOVBtn.TextSize = 11
@@ -768,11 +710,8 @@ local success, launchError = pcall(function()
         end)
     end
 
-    -- ── Exploits Tab ────────────────────────────────────────────────────────
-
     CreateToggle(ExploitsTab, "Perfect Skill Check", "PerfectSkillCheck")
 
-    -- Кнопка «Телепорт к генератору»
     do
         local TpFrame = Instance.new("Frame")
         TpFrame.Size = UDim2.new(1, -5, 0, 35)
@@ -821,11 +760,9 @@ local success, launchError = pcall(function()
         end)
     end
 
-    -- ── Hide/Show Toggle (RightCtrl) ────────────────────────────────────────
-
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
-        if input.KeyCode == Enum.KeyCode.RightControl then
+        if input.KeyCode == Enum.KeyCode.Insert then
             MainFrame.Visible = not MainFrame.Visible
         end
     end)
@@ -834,5 +771,4 @@ end)
 
 if not success then
     warn("[Luna V4] Ошибка запуска: " .. tostring(launchError))
-end
-
+end                    
