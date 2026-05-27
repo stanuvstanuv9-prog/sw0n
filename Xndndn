@@ -27,13 +27,16 @@ local success, launchError = pcall(function()
         SprintWalkSpeed = 25,
         ESP = false,
         Box = false,
+        Highlight = false,
         Tracers = false,
         Fullbright = false,
-        ObjectESP = false,
         FOVValue = 70,
         WallColor = false,
         WallColorValue = Color3.fromRGB(120, 100, 255),
-        ParticleColor = false,
+        SkyColor = false,
+        SkyColorValue = Color3.fromRGB(0, 180, 255),
+        Particles = false,
+        ParticleMode = "Snow",
         PerfectSkillCheck = false
     }
 
@@ -48,7 +51,9 @@ local success, launchError = pcall(function()
         Brightness = Lighting.Brightness,
         ClockTime = Lighting.ClockTime,
         FogEnd = Lighting.FogEnd,
-        GlobalShadows = Lighting.GlobalShadows
+        FogColor = Lighting.FogColor,
+        GlobalShadows = Lighting.GlobalShadows,
+        ColorShift_Top = Lighting.ColorShift_Top
     }
 
     local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
@@ -72,7 +77,7 @@ local success, launchError = pcall(function()
     MainFrame.Position = UDim2.new(0.5, -230, 0.5, -150)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = false
+    MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
 
     local UICorner = Instance.new("UICorner")
@@ -252,10 +257,12 @@ local success, launchError = pcall(function()
 
             local Palette = Instance.new("Frame")
             Palette.Size = UDim2.new(0, 100, 0, 56)
+            Palette.Position = UDim2.new(1, -110, 1, 2)
             Palette.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
             Palette.BorderSizePixel = 0
             Palette.ZIndex = 10
             Palette.Visible = false
+            Palette.Parent = Frame
 
             local PCorn = Instance.new("UICorner")
             PCorn.CornerRadius = UDim.new(0, 4)
@@ -300,10 +307,6 @@ local success, launchError = pcall(function()
 
             ColorBtn.MouseButton1Click:Connect(function()
                 Palette.Visible = not Palette.Visible
-                if Palette.Visible then
-                    Palette.Parent = ScreenGui
-                    Palette.Position = UDim2.new(0, ColorBtn.AbsolutePosition.X + 25, 0, ColorBtn.AbsolutePosition.Y)
-                end
             end)
         end
     end
@@ -389,6 +392,7 @@ local success, launchError = pcall(function()
             Lighting.ClockTime = originalLighting.ClockTime
             Lighting.FogEnd = originalLighting.FogEnd
             Lighting.GlobalShadows = originalLighting.GlobalShadows
+            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
         end
     end
 
@@ -416,6 +420,18 @@ local success, launchError = pcall(function()
             Lighting.Ambient = Config.WallColorValue
         else
             Lighting.Ambient = originalLighting.Ambient
+        end
+    end
+
+    local function applySkyMod(state)
+        if state then
+            Lighting.OutdoorAmbient = Config.SkyColorValue
+            Lighting.ColorShift_Top = Config.SkyColorValue
+            Lighting.FogColor = Config.SkyColorValue
+        else
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
+            Lighting.FogColor = originalLighting.FogColor
         end
     end
 
@@ -538,6 +554,21 @@ local success, launchError = pcall(function()
                     or ("[ Выживший ] " .. player.Name)
 
                 getOrCreateBillboard(character, espColor, espText)
+
+                local highlight = character:FindFirstChild("LunaHighlight")
+                if Config.Highlight then
+                    if not highlight then
+                        highlight = Instance.new("Highlight")
+                        highlight.Name = "LunaHighlight"
+                        highlight.FillTransparency = 0.6
+                        highlight.OutlineTransparency = 0.1
+                        highlight.Parent = character
+                    end
+                    highlight.FillColor = espColor
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                else
+                    if highlight then highlight:Destroy() end
+                end
             end
 
             for _, child in ipairs(Workspace:GetChildren()) do
@@ -591,31 +622,51 @@ local success, launchError = pcall(function()
         end
     end))
 
-    task.spawn(function()
-        while task.wait(0.5) do
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local existingSnow = hrp:FindFirstChild("LunaSnowEmitter")
-                if Config.ParticleColor then
-                    if not existingSnow then
-                        local a = Instance.new("Attachment", hrp)
-                        a.Name = "LunaSnowEmitter"
-                        a.Position = Vector3.new(0, 10, 0)
-                        local pe = Instance.new("ParticleEmitter", a)
-                        pe.Texture = "rbxassetid://243660364"
-                        pe.Rate = 50
-                        pe.Lifetime = NumberRange.new(2, 4)
-                        pe.Speed = NumberRange.new(5, 10)
-                        pe.EmissionDirection = Enum.NormalId.Bottom
-                        pe.SpreadAngle = Vector2.new(180, 180)
-                    end
+    local function UpdateParticles()
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local existing = hrp:FindFirstChild("LunaWeatherAttach")
+        if Config.Particles then
+            if not existing then
+                existing = Instance.new("Attachment", hrp)
+                existing.Name = "LunaWeatherAttach"
+                existing.Position = Vector3.new(0, 15, 0)
+                local pe = Instance.new("ParticleEmitter", existing)
+                pe.Name = "WeatherEmitter"
+                pe.SpreadAngle = Vector2.new(60, 60)
+                pe.EmissionDirection = Enum.NormalId.Bottom
+            end
+            local pe = existing:FindFirstChild("WeatherEmitter")
+            if pe then
+                if Config.ParticleMode == "Snow" then
+                    pe.Texture = "rbxassetid://281983280"
+                    pe.Rate = 400
+                    pe.Speed = NumberRange.new(15, 25)
+                    pe.Lifetime = NumberRange.new(3, 5)
+                    pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0.4)})
+                    pe.Transparency = NumberSequence.new(0.1)
+                    pe.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
                 else
-                    if existingSnow then
-                        existingSnow:Destroy()
-                    end
+                    pe.Texture = "rbxassetid://243660364"
+                    pe.Rate = 600
+                    pe.Speed = NumberRange.new(70, 90)
+                    pe.Lifetime = NumberRange.new(0.5, 1)
+                    pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 0.1)})
+                    pe.Transparency = NumberSequence.new(0.6)
+                    pe.Color = ColorSequence.new(Color3.fromRGB(180, 220, 255))
                 end
             end
+        else
+            if existing then existing:Destroy() end
+        end
+    end
+
+    task.spawn(function()
+        while task.wait(0.5) do
+            UpdateParticles()
         end
     end)
 
@@ -651,6 +702,7 @@ local success, launchError = pcall(function()
 
     CreateToggle(VisualsTab, "ESP (Имена игроков)", "ESP")
     CreateToggle(VisualsTab, "Box ESP (Рамки)", "Box")
+    CreateToggle(VisualsTab, "Highlight (Обводка)", "Highlight")
     CreateToggle(VisualsTab, "Tracers (Линии)", "Tracers")
     CreateToggle(VisualsTab, "Fullbright (Яркость)", "Fullbright", toggleFullbright)
     CreateToggle(VisualsTab, "Цвет стен", "WallColor", applyWallMod,
@@ -658,7 +710,65 @@ local success, launchError = pcall(function()
             Config.WallColorValue = col
             if Config.WallColor then applyWallMod(true) end
         end)
-    CreateToggle(VisualsTab, "Снег (Частицы)", "ParticleColor", nil, false, nil, nil)
+    CreateToggle(VisualsTab, "Цвет неба", "SkyColor", applySkyMod,
+        true, "SkyColorValue", function(col)
+            Config.SkyColorValue = col
+            if Config.SkyColor then applySkyMod(true) end
+        end)
+    
+    CreateToggle(VisualsTab, "Частицы (Погода)", "Particles", function()
+        UpdateParticles()
+    end)
+
+    do
+        local WeatherFrame = Instance.new("Frame")
+        WeatherFrame.Size = UDim2.new(1, -5, 0, 35)
+        WeatherFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+        WeatherFrame.BorderSizePixel = 0
+        WeatherFrame.Parent = VisualsTab
+
+        local WCorn = Instance.new("UICorner")
+        WCorn.CornerRadius = UDim.new(0, 4)
+        WCorn.Parent = WeatherFrame
+
+        local WLabel = Instance.new("TextLabel")
+        WLabel.Size = UDim2.new(0, 160, 1, 0)
+        WLabel.Position = UDim2.new(0, 10, 0, 0)
+        WLabel.BackgroundTransparency = 1
+        WLabel.Text = "Режим погоды"
+        WLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        WLabel.Font = Enum.Font.GothamMedium
+        WLabel.TextSize = 12
+        WLabel.TextXAlignment = Enum.TextXAlignment.Left
+        WLabel.Parent = WeatherFrame
+
+        local WBtn = Instance.new("TextButton")
+        WBtn.Size = UDim2.new(0, 75, 0, 20)
+        WBtn.Position = UDim2.new(1, -83, 0.5, -10)
+        WBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        WBtn.Text = "Снег"
+        WBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        WBtn.Font = Enum.Font.GothamBold
+        WBtn.TextSize = 11
+        WBtn.Parent = WeatherFrame
+
+        local WBCorn = Instance.new("UICorner")
+        WBCorn.CornerRadius = UDim.new(0, 4)
+        WBCorn.Parent = WBtn
+
+        WBtn.MouseButton1Click:Connect(function()
+            if Config.ParticleMode == "Snow" then
+                Config.ParticleMode = "Rain"
+                WBtn.Text = "Дождь"
+            else
+                Config.ParticleMode = "Snow"
+                WBtn.Text = "Снег"
+            end
+            if Config.Particles then
+                UpdateParticles()
+            end
+        end)
+    end
 
     do
         local FOVFrame = Instance.new("Frame")
@@ -762,7 +872,7 @@ local success, launchError = pcall(function()
 
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
-        if input.KeyCode == Enum.KeyCode.Insert then
+        if input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.Insert then
             MainFrame.Visible = not MainFrame.Visible
         end
     end)
@@ -771,4 +881,4 @@ end)
 
 if not success then
     warn("[Luna V4] Ошибка запуска: " .. tostring(launchError))
-end                    
+end
