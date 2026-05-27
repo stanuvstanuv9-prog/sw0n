@@ -17,7 +17,7 @@ local success, launchError = pcall(function()
 
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
 
-    -- Переименовали WallColor/SkyColor в WallColor1 и WallColor2
+    -- Наша обновленная таблица настроек
     local Config = {
         CFrameSpeed    = false,
         SpeedValue     = 2.5,
@@ -48,7 +48,7 @@ local success, launchError = pcall(function()
     local connections   = {}
     local tabs          = {}
     local tabButtons    = {}
-    local uiRegistry    = {} -- Для синхронизации интерфейса при загрузке конфигов
+    local uiRegistry    = {} -- Для синхронизации элементов интерфейса
     local isSprinting   = false
 
     local originalLighting = {
@@ -67,7 +67,7 @@ local success, launchError = pcall(function()
         Camera = Workspace.CurrentCamera
     end)
 
-    -- ── МОДУЛЬ КОНФИГУРАЦИЙ (ПК / АНДРОИД) ──────────────────────────────────
+    -- ── СИСТЕМА КОНФИГОВ ────────────────────────────────────────────────────
     local folderPath = "Luna_V4_Configs"
     if UserInputService:GetPlatform() == Enum.Platform.Windows then
         folderPath = "Luna_CFG"
@@ -109,14 +109,14 @@ local success, launchError = pcall(function()
                     Config[k] = v
                 end
             end
-            -- Обновляем кнопки на самом экране GUI
+            -- Обновляем GUI под новые параметры загруженного файла
             for prop, updateFunc in pairs(uiRegistry) do
-                updateFunc(Config[prop])
+                pcall(function() updateFunc(Config[prop]) end)
             end
         end
     end
 
-    -- ── GUI ИЗ ТВОЕГО ОРИГИНАЛА ──────────────────────────────────────────────
+    -- ── СОЗДАНИЕ ИНТЕРФЕЙСА (Оригинальный дизайн) ───────────────────────────
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "Luna_V4"
     ScreenGui.ResetOnSpawn = false
@@ -130,8 +130,8 @@ local success, launchError = pcall(function()
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 460, 0, 320) -- Слегка увеличили высоту под вкладку конфигов
-    MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
+    MainFrame.Size = UDim2.new(0, 460, 0, 300)
+    MainFrame.Position = UDim2.new(0.5, -230, 0.5, -150)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -141,6 +141,7 @@ local success, launchError = pcall(function()
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = MainFrame
 
+    -- Dragging логика из оригинала
     do
         local dragging, dragStart, startPos
         MainFrame.InputBegan:Connect(function(inp)
@@ -246,7 +247,7 @@ local success, launchError = pcall(function()
     local ConfigsTab  = CreateTab("Configs") 
     SwitchToTab("Main")
 
-    -- ── КНОПКИ С ЦВЕТОВЫМИ ПАЛИТРАМИ ХСВ ─────────────────────────────────────
+    -- ── ОРИГИНАЛЬНЫЙ КОМПОНЕНТ TOGGLE С ХСВ ПАЛИТРОЙ ───────────────────────
     local function CreateToggle(parent, labelText, propName, callback, hasColor, colorPropName, colorCallback)
         local Frame = Instance.new("Frame")
         Frame.Size = UDim2.new(1, -5, 0, 35)
@@ -281,18 +282,20 @@ local success, launchError = pcall(function()
         BCorn.CornerRadius = UDim.new(1, 0)
         BCorn.Parent = Btn
 
-        local function updateVisual(state)
+        local function setVisualState(state)
             Btn.BackgroundColor3 = state and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(45, 45, 55)
         end
 
         Btn.MouseButton1Click:Connect(function()
             Config[propName] = not Config[propName]
-            updateVisual(Config[propName])
+            TweenService:Create(Btn, TweenInfo.new(0.15), {
+                BackgroundColor3 = Config[propName] and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(45, 45, 55)
+            }):Play()
             if callback then callback(Config[propName]) end
         end)
 
         uiRegistry[propName] = function(state)
-            updateVisual(state)
+            setVisualState(state)
             if callback then callback(state) end
         end
 
@@ -380,6 +383,7 @@ local success, launchError = pcall(function()
                 SVMarker.Position = UDim2.new(s, 0, 1 - v, 0)
                 if colorCallback then colorCallback(newColor) end
             end
+            UpdateColorParams()
 
             local draggingSV, draggingHue = false, false
             local function handleInput(input, isHue)
@@ -408,7 +412,9 @@ local success, launchError = pcall(function()
             local isExpanded = false
             ColorBtn.MouseButton1Click:Connect(function()
                 isExpanded = not isExpanded
-                TweenService:Create(Frame, TweenInfo.new(0.2), {Size = isExpanded and UDim2.new(1, -5, 0, 135) or UDim2.new(1, -5, 0, 35)}):Play()
+                TweenService:Create(Frame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                    Size = isExpanded and UDim2.new(1, -5, 0, 135) or UDim2.new(1, -5, 0, 35)
+                }):Play()
             end)
 
             uiRegistry[colorPropName] = function(newColor)
@@ -418,16 +424,15 @@ local success, launchError = pcall(function()
         end
     end
 
-    -- ── ПОДКЛЮЧЕНИЕ МОДОВ ИЗ ОРИГИНАЛА ──────────────────────────────────────
+    -- ── ФУНКЦИОНАЛ ИЗ ОРИГИНАЛА ─────────────────────────────────────────────
     local function updateLocalTrail()
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = char:WaitForChild("HumanoidRootPart", 5)
-        if not hrp then return end
+        local char = LocalPlayer.Character if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart") if not hrp then return end
         local oldTrail = char:FindFirstChild("LunaTrailInstance")
         if Config.Trails then
             if not oldTrail then
-                local att0 = Instance.new("Attachment", hrp) att0.Name = "LunaAtt0" table.insert(connections, att0) att0.Position = Vector3.new(0, 1, 0)
-                local att1 = Instance.new("Attachment", hrp) att1.Name = "LunaAtt1" table.insert(connections, att1) att1.Position = Vector3.new(0, -1, 0)
+                local att0 = Instance.new("Attachment", hrp) att0.Name = "LunaAtt0" att0.Position = Vector3.new(0, 1, 0)
+                local att1 = Instance.new("Attachment", hrp) att1.Name = "LunaAtt1" att1.Position = Vector3.new(0, -1, 0)
                 local trail = Instance.new("Trail", char) trail.Name = "LunaTrailInstance" trail.Attachment0 = att0 trail.Attachment1 = att1
                 trail.Lifetime = 0.5 trail.LightEmission = 0.8
                 trail.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1)})
@@ -435,8 +440,7 @@ local success, launchError = pcall(function()
             local trail = char:FindFirstChild("LunaTrailInstance")
             if trail then
                 trail.Color = ColorSequence.new(Config.TrailColorValue)
-                trail.WidthScale = Config.TrailMode == "Worm" and NumberSequence.new(0.04) or NumberSequence.new(1.0)
-                trail.FaceCamera = Config.TrailMode == "Worm"
+                if Config.TrailMode == "Worm" then trail.WidthScale = NumberSequence.new(0.04) trail.FaceCamera = true else trail.WidthScale = NumberSequence.new(1.0) trail.FaceCamera = false end
             end
         else
             if oldTrail then oldTrail:Destroy() end
@@ -457,7 +461,7 @@ local success, launchError = pcall(function()
     end))
 
     table.insert(connections, RunService.RenderStepped:Connect(function()
-        if not LocalPlayer.Character then return end
+      if not LocalPlayer.Character then return end
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not hum then return end
         if Config.NoFall and hum:GetState() == Enum.HumanoidStateType.Freefall then hum:ChangeState(Enum.HumanoidStateType.Running) end
@@ -492,9 +496,7 @@ local success, launchError = pcall(function()
                     pcall(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new(0, 0)) end)
                 end)
             end
-        else
-            if antiAfkConnection then antiAfkConnection:Disconnect() antiAfkConnection = nil end
-        end
+        else if antiAfkConnection then antiAfkConnection:Disconnect() antiAfkConnection = nil end end
     end
 
     local function toggleFullbright(state)
@@ -502,6 +504,7 @@ local success, launchError = pcall(function()
             Lighting.Ambient = originalLighting.Ambient Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
             Lighting.Brightness = originalLighting.Brightness Lighting.ClockTime = originalLighting.ClockTime
             Lighting.FogEnd = originalLighting.FogEnd Lighting.GlobalShadows = originalLighting.GlobalShadows
+            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
         end
     end
 
@@ -519,15 +522,20 @@ local success, launchError = pcall(function()
         end
     end)
 
-    -- ЛОГИКА ИЗМЕНЕНИЯ ЦВЕТА СТЕН 1 И СТЕН 2
-    local function applyWallColor1(state) 
-        Lighting.Ambient = state and Config.WallColor1Value or originalLighting.Ambient 
+    -- РАБОЧАЯ МОДИФИКАЦИЯ ЦВЕТА СТЕН 1 И СТЕН 2 (Бывшие Wall/Sky)
+    local function applyWallColor1(state)
+        Lighting.Ambient = state and Config.WallColor1Value or originalLighting.Ambient
     end
+
     local function applyWallColor2(state)
         if state then
-            Lighting.OutdoorAmbient, Lighting.ColorShift_Top, Lighting.FogColor = Config.WallColor2Value, Config.WallColor2Value, Config.WallColor2Value
+            Lighting.OutdoorAmbient = Config.WallColor2Value
+            Lighting.ColorShift_Top = Config.WallColor2Value
+            Lighting.FogColor       = Config.WallColor2Value
         else
-            Lighting.OutdoorAmbient, Lighting.ColorShift_Top, Lighting.FogColor = originalLighting.OutdoorAmbient, originalLighting.ColorShift_Top, originalLighting.FogColor
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+            Lighting.ColorShift_Top = originalLighting.ColorShift_Top
+            Lighting.FogColor       = originalLighting.FogColor
         end
     end
 
@@ -571,26 +579,37 @@ local success, launchError = pcall(function()
         local hl = folder:FindFirstChild("LunaHighlight")
         if Config.Box then
             if not hl then hl = Instance.new("Highlight", folder) hl.Name = "LunaHighlight" hl.FillTransparency = 0.5 hl.OutlineTransparency = 0.1 hl.Adornee = character end
-            hl.FillColor, hl.OutlineColor = color, Color3.new(1,1,1)
+            hl.FillColor, hl.OutlineColor = color, Color3.new(1, 1, 1)
         else if hl then hl:Destroy() end end
+
+        if Config.Tracers and not ScreenGui:FindFirstChild("TracerFrame") then
+            local tf = Instance.new("Frame", ScreenGui) tf.Name = "TracerFrame" tf.Size = UDim2.new(1, 0, 1, 0) tf.BackgroundTransparency = 1
+        end
     end
 
     task.spawn(function()
         while task.wait(0.1) do
             for _, player in ipairs(Players:GetPlayers()) do
-                if player == LocalPlayer then continue end
-                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                     local isKiller = checkIsKiller(player, player.Character)
                     getOrCreateBillboard(player.Character, isKiller and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(0, 255, 120), isKiller and ("[ МАНЬЯК ] " .. player.Name) or ("[ Выживший ] " .. player.Name))
+                end
+            end
+            for _, child in ipairs(Workspace:GetChildren()) do
+                local folder = child:FindFirstChild("Luna_Visuals_Container")
+                if folder then
+                    local stillInGame = false
+                    for _, pl in ipairs(Players:GetPlayers()) do if pl.Character == child then stillInGame = true break end end
+                    if not stillInGame then folder:Destroy() end
                 end
             end
         end
     end)
 
     table.insert(connections, RunService.RenderStepped:Connect(function()
-        local tf = ScreenGui:FindFirstChild("TracerFrame") if tf then tf:Destroy() end
+        local tf = ScreenGui:FindFirstChild("TracerFrame") if not tf then return end
+        for _, c in ipairs(tf:GetChildren()) do c:Destroy() end
         if not Config.Tracers then return end
-        tf = Instance.new("Frame", ScreenGui) tf.Name = "TracerFrame" tf.Size = UDim2.new(1,0,1,0) tf.BackgroundTransparency = 1
         local vp = Camera.ViewportSize local origin = Vector2.new(vp.X / 2, vp.Y)
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -613,15 +632,15 @@ local success, launchError = pcall(function()
         if Config.Particles then
             if not existing then
                 existing = Instance.new("Attachment", hrp) existing.Name = "LunaWeatherAttach" existing.Position = Vector3.new(0, 20, 0)
-                local pe = Instance.new("ParticleEmitter", existing) pe.Name = "WeatherEmitter" pe.EmissionDirection = Enum.NormalId.Bottom pe.SpreadAngle = Vector2.new(60, 60)
+                Instance.new("ParticleEmitter", existing).Name = "WeatherEmitter"
             end
             local pe = existing:FindFirstChild("WeatherEmitter")
             if pe then
-                pe.Texture = "rbxassetid://281982705"
+                pe.Texture, pe.EmissionDirection, pe.SpreadAngle = "rbxassetid://281982705", Enum.NormalId.Bottom, Vector2.new(60, 60)
                 if Config.ParticleMode == "Snow" then
-                    pe.Rate, pe.Speed, pe.Lifetime, pe.Acceleration, pe.Color = 250, NumberRange.new(15, 25), NumberRange.new(3, 5), Vector3.new(0, -10, 0), ColorSequence.new(Color3.new(1,1,1))
+                    pe.Rate, pe.Speed, pe.Lifetime, pe.Size, pe.Transparency, pe.Color, pe.Acceleration = 250, NumberRange.new(15, 25), NumberRange.new(3, 5), NumberSequence.new(0.2, 0.4), NumberSequence.new(0.1), ColorSequence.new(Color3.fromRGB(255, 255, 255)), Vector3.new(0, -10, 0)
                 else
-                    pe.Rate, pe.Speed, pe.Lifetime, pe.Acceleration, pe.Color = 800, NumberRange.new(80, 120), NumberRange.new(0.5, 1), Vector3.new(0, -60, 0), ColorSequence.new(Color3.fromRGB(180, 200, 255))
+                    pe.Rate, pe.Speed, pe.Lifetime, pe.Size, pe.Transparency, pe.Color, pe.Acceleration = 800, NumberRange.new(80, 120), NumberRange.new(0.5, 1), NumberSequence.new(0.05, 0.1), NumberSequence.new(0.5), ColorSequence.new(Color3.fromRGB(180, 200, 255)), Vector3.new(0, -60, 0)
                 end
             end
         else if existing then existing:Destroy() end end
@@ -635,8 +654,8 @@ local success, launchError = pcall(function()
                 for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
                     for _, child in ipairs(sg:GetDescendants()) do
                         if child:IsA("Frame") and child.Visible and (child.Name:lower():find("skillcheck") or child.Name:lower():find("greatzone")) then
-                            local vi = Instance.new("InputObject") vi.KeyCode, vi.UserInputType = Enum.KeyCode.Space, Enum.UserInputType.Keyboard
-                            UserInputService.InputBegan:Fire(vi, false)
+                            local vInput = Instance.new("InputObject") vInput.KeyCode, vInput.UserInputType = Enum.KeyCode.Space, Enum.UserInputType.Keyboard
+                            UserInputService.InputBegan:Fire(vInput, false)
                         end
                     end
                 end
@@ -657,38 +676,37 @@ local success, launchError = pcall(function()
     CreateToggle(VisualsTab, "Fullbright (Яркость)", "Fullbright", toggleFullbright)
     CreateToggle(VisualsTab, "Линия за спиной (Trails)", "Trails", function() pcall(updateLocalTrail) end, true, "TrailColorValue", function(col) Config.TrailColorValue = col pcall(updateLocalTrail) end)
 
-    -- Режимы шлейфа
+    -- Блок выбора режима шлейфа
     do
         local F = Instance.new("Frame", VisualsTab) F.Size = UDim2.new(1, -5, 0, 35) F.BackgroundColor3 = Color3.fromRGB(22, 22, 30) F.BorderSizePixel = 0 Instance.new("UICorner", F).CornerRadius = UDim.new(0, 4)
         local L = Instance.new("TextLabel", F) L.Size = UDim2.new(0, 160, 1, 0) L.Position = UDim2.new(0, 10, 0, 0) L.BackgroundTransparency = 1 L.Text = "Режим линии (шлейфа)" L.TextColor3 = Color3.fromRGB(220, 220, 220) L.Font = Enum.Font.GothamMedium L.TextSize = 12 L.TextXAlignment = Enum.TextXAlignment.Left
         local B = Instance.new("TextButton", F) B.Size = UDim2.new(0, 75, 0, 20) B.Position = UDim2.new(1, -83, 0.5, -10) B.BackgroundColor3 = Color3.fromRGB(45, 45, 55) B.Text = "Обычный" B.TextColor3 = Color3.fromRGB(255, 255, 255) B.Font = Enum.Font.GothamBold B.TextSize = 11 Instance.new("UICorner", B).CornerRadius = UDim.new(0, 4)
         B.MouseButton1Click:Connect(function()
             Config.TrailMode = Config.TrailMode == "Default" and "Worm" or "Default"
-            B.Text = Config.TrailMode == "Worm" and "Червяк" or "Обычный"
-            pcall(updateLocalTrail)
+            B.Text = Config.TrailMode == "Worm" and "Червяк" or "Обычный" pcall(updateLocalTrail)
         end)
         uiRegistry["TrailMode"] = function(val) B.Text = val == "Worm" and "Червяк" or "Обычный" pcall(updateLocalTrail) end
     end
 
-    -- ТЕПЕРЬ ТУТ КОРРЕКТНЫЕ НАЗВАНИЯ WALLCOLOR 1 И WALLCOLOR 2
+    -- ТЕПЕРЬ ТУТ ЦВЕТА СТЕН ПОД ТВОИМ НАЗВАНИЕМ
     CreateToggle(VisualsTab, "Цвет стен 1", "WallColor1", applyWallColor1, true, "WallColor1Value", function(col) if Config.WallColor1 then applyWallColor1(true) end end)
     CreateToggle(VisualsTab, "Цвет стен 2", "WallColor2", applyWallColor2, true, "WallColor2Value", function(col) if Config.WallColor2 then applyWallColor2(true) end end)
+    
     CreateToggle(VisualsTab, "Частицы (Погода)", "Particles", function() UpdateParticles() end)
 
-    -- Погода
+    -- Выбор погоды
     do
         local F = Instance.new("Frame", VisualsTab) F.Size = UDim2.new(1, -5, 0, 35) F.BackgroundColor3 = Color3.fromRGB(22, 22, 30) F.BorderSizePixel = 0 Instance.new("UICorner", F).CornerRadius = UDim.new(0, 4)
         local L = Instance.new("TextLabel", F) L.Size = UDim2.new(0, 160, 1, 0) L.Position = UDim2.new(0, 10, 0, 0) L.BackgroundTransparency = 1 L.Text = "Режим погоды" L.TextColor3 = Color3.fromRGB(220, 220, 220) L.Font = Enum.Font.GothamMedium L.TextSize = 12 L.TextXAlignment = Enum.TextXAlignment.Left
         local B = Instance.new("TextButton", F) B.Size = UDim2.new(0, 75, 0, 20) B.Position = UDim2.new(1, -83, 0.5, -10) B.BackgroundColor3 = Color3.fromRGB(45, 45, 55) B.Text = "Снег" B.TextColor3 = Color3.fromRGB(255, 255, 255) B.Font = Enum.Font.GothamBold B.TextSize = 11 Instance.new("UICorner", B).CornerRadius = UDim.new(0, 4)
         B.MouseButton1Click:Connect(function()
             Config.ParticleMode = Config.ParticleMode == "Snow" and "Rain" or "Snow"
-            B.Text = Config.ParticleMode == "Rain" and "Дождь" or "Снег"
-            if Config.Particles then UpdateParticles() end
+            B.Text = Config.ParticleMode == "Rain" and "Дождь" or "Снег" if Config.Particles then UpdateParticles() end
         end)
         uiRegistry["ParticleMode"] = function(val) B.Text = val == "Rain" and "Дождь" or "Снег" if Config.Particles then UpdateParticles() end end
     end
 
-    -- FOV
+    -- FOV Кнопка
     do
         local F = Instance.new("Frame", VisualsTab) F.Size = UDim2.new(1, -5, 0, 35) F.BackgroundColor3 = Color3.fromRGB(22, 22, 30) F.BorderSizePixel = 0 Instance.new("UICorner", F).CornerRadius = UDim.new(0, 4)
         local L = Instance.new("TextLabel", F) L.Size = UDim2.new(0, 160, 1, 0) L.Position = UDim2.new(0, 10, 0, 0) L.BackgroundTransparency = 1 L.Text = "Поле зрения (FOV)" L.TextColor3 = Color3.fromRGB(220, 220, 220) L.Font = Enum.Font.GothamMedium L.TextSize = 12 L.TextXAlignment = Enum.TextXAlignment.Left
@@ -725,7 +743,7 @@ local success, launchError = pcall(function()
     createTpButton("ТП к ближайшему генератору", {"generator", "gen"})
     createTpButton("ТП к ближайшим воротам (выходу)", {"gate", "door", "exit", "escape"})
 
-    -- ── ИНТЕРФЕЙС ВКЛАДКИ CONFIGS ───────────────────────────────────────────
+    -- ── ВКЛАДКА CONFIGS ДЛЯ КНОПОК СОХРАНЕНИЯ/ЗАГРУЗКИ ──────────────────────
     local NameInput = Instance.new("TextBox", ConfigsTab) NameInput.Size = UDim2.new(1, -5, 0, 32) NameInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35) NameInput.Text = "luna_config" NameInput.TextColor3 = Color3.new(1,1,1) NameInput.Font = Enum.Font.GothamMedium NameInput.TextSize = 12 Instance.new("UICorner", NameInput).CornerRadius = UDim.new(0, 4)
     
     local SaveBtn = Instance.new("TextButton", ConfigsTab) SaveBtn.Size = UDim2.new(1, -5, 0, 32) SaveBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 220) SaveBtn.Text = "Сохранить Конфиг (.cfg)" SaveBtn.TextColor3 = Color3.new(1,1,1) SaveBtn.Font = Enum.Font.GothamBold SaveBtn.TextSize = 12 Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 4)
@@ -736,17 +754,4 @@ local success, launchError = pcall(function()
 
     SaveBtn.MouseButton1Click:Connect(function()
         saveSettings(NameInput.Text) LogLabel.Text = "Saved: " .. NameInput.Text .. ".cfg"
-        task.delay(1.5, function() LogLabel.Text = "ПК: Luna_CFG | Моб: Luna_V4_Configs" end)
-    end)
-    LoadBtn.MouseButton1Click:Connect(function()
-        loadSettings(NameInput.Text) LogLabel.Text = "Loaded: " .. NameInput.Text .. ".cfg"
-        task.delay(1.5, function() LogLabel.Text = "ПК: Luna_CFG | Моб: Luna_V4_Configs" end)
-    end)
-
-    -- Открытие/Закрытие меню
-    UserInputService.InputBegan:Connect(function(input, gp)
-        if gp then return end
-        if input.KeyCode == Enum.KeyCode.RightControl or input.KeyCode == Enum.KeyCode.Insert then MainFrame.Visible = not MainFrame.Visible end
-    end)
-end)
-if not success then warn("[Luna V4] Ошибка: " .. tostring(launc
+        task.delay(1.5, function  
