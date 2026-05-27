@@ -1,277 +1,205 @@
--- [[ LUNA V3 - Anti-Bug Edition ]] --
+-- [[ LUNA V4 - Multi-Tab Premium Edition ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
 
-local Config = { 
-    Noclip = false, 
-    ESP = false, 
-    AutoSkillCheck = false,
-    Speedhack = false,
-    SpeedValue = 22,
+-- Глобальный конфиг софта
+local Config = {
+    -- Main
+    CFrameSpeed = false,
+    SpeedValue = 2.5, -- Множитель CFrame скорости (не WalkSpeed)
     NoFall = false,
-    ObjectESP = false
+    Noclip = false,
+    -- Visuals
+    ESP = false,
+    ObjectESP = false,
+    FOVValue = 70,
+    CustomSky = false,
+    SkyColor = Color3.fromRGB(120, 100, 255), -- Фиолетово-лунный оттенок неба
+    -- Exploits
+    PerfectSkillCheck = false
 }
 
 local espFolders = {}
 local connections = {}
+local tabs = {}
+local tabButtons = {}
 
--- [[ GUI БЕЗ БАГАННЫХ ПОЛОС (Полностью удален UIStroke) ]] --
+-- [[ СОЗДАНИЕ ИНТЕРФЕЙСА С ВКЛАДКАМИ ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Luna_V3"
+ScreenGui.Name = "Luna_V4"
 ScreenGui.ResetOnSpawn = false
 pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 340, 0, 320)
-MainFrame.Position = UDim2.new(0.5, -170, 0.6, -160) -- Смещено еще ниже
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Size = UDim2.new(0, 460, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -230, 0.55, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 6)
+UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Вместо UIStroke используем плоскую рамку-заголовок, она никогда не забагуется полосой
-local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 35)
-Header.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-Header.BorderSizePixel = 0
-Header.Parent = MainFrame
+-- Левый сайдбар для вкладок
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 120, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = MainFrame
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -10, 1, 0)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "LUNA V3 | Violence District"
-Title.TextColor3 = Color3.fromRGB(0, 180, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = Header
+local SidebarCorner = Instance.new("UICorner")
+SidebarCorner.CornerRadius = UDim.new(0, 8)
+SidebarCorner.Parent = Sidebar
 
-local Container = Instance.new("ScrollingFrame")
-Container.Size = UDim2.new(1, -20, 1, -45)
-Container.Position = UDim2.new(0, 10, 0, 40)
-Container.BackgroundTransparency = 1
-Container.CanvasSize = UDim2.new(0, 0, 0, 360)
-Container.ScrollBarThickness = 0 -- Скрыли полосу прокрутки
-Container.Parent = MainFrame
+local Logo = Instance.new("TextLabel")
+Logo.Size = UDim2.new(1, 0, 0, 40)
+Logo.BackgroundTransparency = 1
+Logo.Text = "LUNA V4"
+Logo.TextColor3 = Color3.fromRGB(0, 180, 255)
+Logo.Font = Enum.Font.GothamBold
+Logo.TextSize = 16
+Logo.Parent = Sidebar
 
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 6)
-UIListLayout.Parent = Container
+local TabBtnContainer = Instance.new("Frame")
+TabBtnContainer.Size = UDim2.new(1, 0, 1, -50)
+TabBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+TabBtnContainer.BackgroundTransparency = 1
+TabBtnContainer.Parent = Sidebar
 
-local function CreateToggle(name, propName, callback)
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 38)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
-    ToggleFrame.BorderSizePixel = 0
-    ToggleFrame.Parent = Container
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Padding = UDim.new(0, 4)
+TabListLayout.Parent = TabBtnContainer
+
+-- Правая основная часть для контента
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -130, 1, -10)
+ContentFrame.Position = UDim2.new(0, 125, 0, 5)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- Функция переключения вкладок
+local function SwitchToTab(tabName)
+    for name, frame in pairs(tabs) do
+        frame.Visible = (name == tabName)
+    end
+    for name, btn in pairs(tabButtons) do
+        btn.TextColor3 = (name == tabName) and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(150, 150, 150)
+    end
+end
+
+-- Функция создания вкладки
+local function CreateTab(name)
+    local TabButton = Instance.new("TextButton")
+    TabButton.Size = UDim2.new(1, 0, 0, 32)
+    TabButton.BackgroundTransparency = 1
+    TabButton.Text = "  " .. name
+    TabButton.TextColor3 = Color3.fromRGB(150, 150, 150)
+    TabButton.Font = Enum.Font.GothamMedium
+    TabButton.TextSize = 13
+    TabButton.TextXAlignment = Enum.TextXAlignment.Left
+    TabButton.Parent = TabBtnContainer
+    tabButtons[name] = TabButton
+
+    local Page = Instance.new("ScrollingFrame")
+    Page.Size = UDim2.new(1, 0, 1, 0)
+    Page.BackgroundTransparency = 1
+    Page.Visible = false
+    Page.CanvasSize = UDim2.new(0, 0, 0, 300)
+    Page.ScrollBarThickness = 0
+    Page.Parent = ContentFrame
+    tabs[name] = Page
+
+    local PageLayout = Instance.new("UIListLayout")
+    PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PageLayout.Padding = UDim.new(0, 6)
+    PageLayout.Parent = Page
+
+    TabButton.MouseButton1Click:Connect(function()
+        SwitchToTab(name)
+    end)
+
+    return Page
+end
+
+-- Создаем 3 вкладки
+local MainTab = CreateTab("Main")
+local VisualsTab = CreateTab("Visuals")
+local ExploitsTab = CreateTab("Exploits")
+SwitchToTab("Main") -- Первая по умолчанию
+
+-- Универсальный элемент интерфейса (Toggle)
+local function CreateToggle(parent, name, propName, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -5, 0, 35)
+    Frame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = parent
     
-    local TFCorner = Instance.new("UICorner")
-    TFCorner.CornerRadius = UDim.new(0, 4)
-    TFCorner.Parent = ToggleFrame
+    local FCorn = Instance.new("UICorner")
+    FCorn.CornerRadius = UDim.new(0, 4)
+    FCorn.Parent = Frame
 
-    local TextLabel = Instance.new("TextLabel")
-    TextLabel.Size = UDim2.new(1, -60, 1, 0)
-    TextLabel.Position = UDim2.new(0, 10, 0, 0)
-    TextLabel.BackgroundTransparency = 1
-    TextLabel.Text = name
-    TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
-    TextLabel.Font = Enum.Font.GothamMedium
-    TextLabel.TextSize = 12
-    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TextLabel.Parent = ToggleFrame
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -50, 1, 0)
+    Label.Position = UDim2.new(0, 10, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
 
-    local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(0, 35, 0, 18)
-    Button.Position = UDim2.new(1, -45, 0.5, -9)
-    Button.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    Button.Text = ""
-    Button.Parent = ToggleFrame
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0, 35, 0, 16)
+    Btn.Position = UDim2.new(1, -45, 0.5, -8)
+    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    Btn.Text = ""
+    Btn.Parent = Frame
     
-    local BCorner = Instance.new("UICorner")
-    BCorner.CornerRadius = UDim.new(1, 0)
-    BCorner.Parent = Button
+    local BCorn = Instance.new("UICorner")
+    BCorn.CornerRadius = UDim.new(1, 0)
+    BCorn.Parent = Btn
 
-    Button.MouseButton1Click:Connect(function()
+    Btn.MouseButton1Click:Connect(function()
         Config[propName] = not Config[propName]
-        local enabled = Config[propName]
-        
-        TweenService:Create(Button, TweenInfo.new(0.15), {
-            BackgroundColor3 = enabled and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(50, 50, 60)
+        TweenService:Create(Btn, TweenInfo.new(0.15), {
+            BackgroundColor3 = Config[propName] and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(45, 45, 55)
         }):Play()
-        
-        if callback then callback(enabled) end
+        if callback then callback(Config[propName]) end
     end)
 end
 
--- [[ АБСОЛЮТНО НОВЫЙ ESP (Через Текстовые Свечения — БЕЗ багов с Highlight) ]] --
-local function createBillboardESP(player)
-    if player == LocalPlayer then return end
-    
-    local function removeOldEsp()
-        if espFolders[player] then
-            pcall(function() espFolders[player]:Destroy() end)
-            espFolders[player] = nil
+-- [[ НАПОЛНЕНИЕ ВКЛАДКИ: MAIN ]] --
+
+-- Реализация правильного CFrame Speedhack (в обход системного WalkSpeed)
+table.insert(connections, RunService.RenderStepped:Connect(function(dt)
+    if Config.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            -- Мягко проталкиваем вектор позиции вперед, куда нажат WASD/Стик
+            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (Config.SpeedValue * dt * 10))
         end
     end
+end))
 
-    local function onChar(character)
-        removeOldEsp()
-        if not Config.ESP then return end
-        
-        local root = character:WaitForChild("HumanoidRootPart", 5)
-        if not root then return end
-        
-        local folder = Instance.new("Folder")
-        folder.Name = "Luna_PlayerESP"
-        folder.Parent = character
-        espFolders[player] = folder
-
-        -- Текстовый оверхед (Ник + Роль)
-        local bb = Instance.new("BillboardGui")
-        bb.Size = UDim2.new(0, 200, 0, 50)
-        bb.AlwaysOnTop = true
-        bb.ExtentsOffset = Vector3.new(0, 3, 0)
-        bb.Adornee = root
-        bb.Parent = folder
-
-        local txt = Instance.new("TextLabel")
-        txt.Size = UDim2.new(1, 0, 1, 0)
-        txt.BackgroundTransparency = 1
-        txt.Font = Enum.Font.GothamBold
-        txt.TextSize = 13
-        txt.TextStrokeTransparency = 0
-        txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        txt.Parent = bb
-
-        -- Жесткая проверка на Маньяка (Killer)
-        local isKiller = false
-        
-        -- 1. Проверка по названию команды
-        if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("murder") or player.Team.Name:lower():find("beast")) then
-            isKiller = true
-        -- 2. Проверка по инструментам/оружию
-        elseif character:FindFirstChildOfClass("Tool") or player:WaitForChild("Backpack", 1):FindFirstChildOfClass("Tool") then
-            isKiller = true
-        -- 3. Проверка по кастомным атрибутам Violence District
-        elseif character:GetAttribute("Role") == "Killer" or character:GetAttribute("IsKiller") == true then
-            isKiller = true
-        end
-
-        if isKiller then
-            txt.Text = "[ МАНЬЯК ]\n" .. player.DisplayName
-            txt.TextColor3 = Color3.fromRGB(255, 0, 0) -- Ярко-красный
-            
-            -- Бокс подсветки для маньяка
-            local box = Instance.new("BoxHandleAdornment")
-            box.Size = Vector3.new(4, 6, 4)
-            box.Color3 = Color3.fromRGB(255, 0, 0)
-            box.AlwaysOnTop = true
-            box.ZIndex = 6
-            box.Adornee = root
-            box.Transparency = 0.5
-            box.Parent = folder
-        else
-            txt.Text = "[ Выживший ]\n" .. player.DisplayName
-            txt.TextColor3 = Color3.fromRGB(0, 255, 150) -- Зеленый
-        end
-    end
-
-    player.CharacterAdded:Connect(onChar)
-    if player.Character then onChar(player.Character) end
-end
-
-local function toggleESP(state)
-    if state then
-        for _, p in ipairs(Players:GetPlayers()) do createBillboardESP(p) end
-        table.insert(connections, Players.PlayerAdded:Connect(createBillboardESP))
-    else
-        for _, folder in pairs(espFolders) do pcall(function() folder:Destroy() end) end
-        table.clear(espFolders)
-    end
-end
-
--- [[ НОВЫЙ ESP НА ОБЪЕКТЫ (Генераторы / Палеты) ]] --
-local function toggleObjectESP(state)
-    if state then
-        table.insert(connections, RunService.Heartbeat:Connect(function()
-            if not Config.ObjectESP then return end
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("Model") and not obj:FindFirstChild("LunaObj") then
-                    local name = obj.Name:lower()
-                    local isGen = name:find("gen") or name:find("motor") or name:find("engine")
-                    local isPallet = name:find("pallet") or name:find("plate") or name:find("board")
-                    
-                    if isGen or isPallet then
-                        local folder = Instance.new("Folder")
-                        folder.Name = "LunaObj"
-                        folder.Parent = obj
-                        
-                        local bb = Instance.new("BillboardGui")
-                        bb.Size = UDim2.new(0, 150, 0, 30)
-                        bb.AlwaysOnTop = true
-                        bb.Adornee = obj:FindFirstChildOfClass("BasePart") or obj
-                        bb.Parent = folder
-                        
-                        local txt = Instance.new("TextLabel")
-                        txt.Size = UDim2.new(1, 0, 1, 0)
-                        txt.BackgroundTransparency = 1
-                        txt.Font = Enum.Font.GothamBold
-                        txt.TextSize = 11
-                        txt.TextStrokeTransparency = 0
-                        txt.Text = isGen and "[ ГЕНЕРАТОР ]" or "[ ПАЛЕТА ]"
-                        txt.TextColor3 = isGen and Color3.fromRGB(255, 200, 0) or Color3.fromRGB(160, 120, 90)
-                        txt.Parent = bb
-                    end
-                end
-            end
-        end))
-    else
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            local f = obj:FindFirstChild("LunaObj")
-            if f then pcall(function() f:Destroy() end) end
-        end
-    end
-end
-
--- [[ АВТО-СКИЛЛЧЕК (Поиск по всем GUI игры) ]] --
-local function toggleSkillCheck(state)
-    if not state then return end
-    local pGui = LocalPlayer:WaitForChild("PlayerGui")
-    
-    local function scan(descendant)
-        if Config.AutoSkillCheck and descendant:IsA("GuiObject") then
-            local n = descendant.Name:lower()
-            -- Проверяем вообще все возможные триггеры зоны успеха в разных плейсах
-            if n:find("zone") or n:find("success") or n:find("perfect") or n:find("check") or n:find("bar") then
-                task.wait(0.01)
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                task.wait(0.01)
-                vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-            end
-        end
-    end
-    table.insert(connections, pGui.DescendantAdded:Connect(scan))
-end
-
--- [[ ОСТАЛЬНЫЕ ФУНКЦИИ ]] --
+-- Реализация NoFall & Noclip
 table.insert(connections, RunService.RenderStepped:Connect(function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        local hum = LocalPlayer.Character.Humanoid
-        if Config.Speedhack then hum.WalkSpeed = Config.SpeedValue end
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if Config.NoFall and hum:GetState() == Enum.HumanoidStateType.Freefall then
             hum:ChangeState(Enum.HumanoidStateType.Running)
         end
@@ -286,21 +214,178 @@ table.insert(connections, RunService.Stepped:Connect(function()
     end
 end))
 
--- Кнопки
-CreateToggle("Включить ESP (Игроки/Маньяк)", "ESP", toggleESP)
-CreateToggle("Включить ESP (Генераторы/Палеты)", "ObjectESP", toggleObjectESP)
-CreateToggle("Авто-Скиллчек (Глобальный хак)", "AutoSkillCheck", toggleSkillCheck)
-CreateToggle("Noclip (Сквозь стены)", "Noclip")
-CreateToggle("Speedhack (Быстрый бег)", "Speedhack")
-CreateToggle("No Fall (Анти-падение)", "NoFall")
+CreateToggle(MainTab, "Кастомный Speedhack (CFrame)", "CFrameSpeed")
+CreateToggle(MainTab, "Noclip (Сквозь стены)", "Noclip")
+CreateToggle(MainTab, "No Fall (Анти-урон)", "NoFall")
 
--- Insert
+
+-- [[ НАПОЛНЕНИЕ ВКЛАДКИ: VISUALS ]] --
+
+-- Функция динамического изменения FOV
+local function updateFOV()
+    table.insert(connections, RunService.RenderStepped:Connect(function()
+        if Camera.FieldOfView ~= Config.FOVValue then
+            Camera.FieldOfView = Config.FOVValue
+        end
+    end))
+end
+
+-- Слайдер / Кнопки для быстрого переключения FOV
+local FOVFrame = Instance.new("Frame")
+FOVFrame.Size = UDim2.new(1, -5, 0, 35)
+FOVFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+FOVFrame.BorderSizePixel = 0
+FOVFrame.Parent = VisualsTab
+
+local FOVLabel = Instance.new("TextLabel")
+FOVLabel.Size = UDim2.new(0, 100, 1, 0)
+FOVLabel.Position = UDim2.new(0, 10, 0, 0)
+FOVLabel.BackgroundTransparency = 1
+FOVLabel.Text = "Режим обзора (FOV)"
+FOVLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+FOVLabel.Font = Enum.Font.GothamMedium
+FOVLabel.TextSize = 12
+FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
+FOVLabel.Parent = FOVFrame
+
+local FOVBtn = Instance.new("TextButton")
+FOVBtn.Size = UDim2.new(0, 60, 0, 20)
+FOVBtn.Position = UDim2.new(1, -70, 0.5, -10)
+FOVBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+FOVBtn.Text = "90 FOV"
+FOVBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FOVBtn.Font = Enum.Font.GothamBold
+FOVBtn.TextSize = 11
+FOVBtn.Parent = FOVFrame
+local FBCorn = Instance.new("UICorner")
+FBCorn.CornerRadius = UDim.new(0, 4)
+FBCorn.Parent = FOVBtn
+
+FOVBtn.MouseButton1Click:Connect(function()
+    if Config.FOVValue == 70 then
+        Config.FOVValue = 95
+        FOVBtn.Text = "95 FOV"
+    elseif Config.FOVValue == 95 then
+        Config.FOVValue = 110
+        FOVBtn.Text = "110 FOV"
+    else
+        Config.FOVValue = 70
+        FOVBtn.Text = "70 Default"
+    end
+end)
+updateFOV()
+
+-- Клиентское изменение цвета неба/атмосферы
+local function applySkyMod(state)
+    if state then
+        Lighting.Ambient = Config.SkyColor
+        Lighting.OutdoorAmbient = Config.SkyColor
+        Lighting.FogColor = Config.SkyColor
+    else
+        -- Возвращаем дефолтные значения (примерные)
+        Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    end
+end
+
+-- Проверенные фиксы ESP из прошлой версии
+local function applyPlayerESP(player)
+    if player == LocalPlayer then return end
+    local function onChar(character)
+        if espFolders[player] then pcall(function() espFolders[player]:Destroy() end) end
+        if not Config.ESP then return end
+        
+        local root = character:WaitForChild("HumanoidRootPart", 5)
+        if not root then return end
+        
+        local folder = Instance.new("Folder")
+        folder.Name = "Luna_ESP"
+        folder.Parent = character
+        espFolders[player] = folder
+
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0, 160, 0, 40)
+        bb.AlwaysOnTop = true
+        bb.Adornee = root
+        bb.Parent = folder
+
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Font = Enum.Font.GothamBold
+        txt.TextSize = 12
+        txt.TextStrokeTransparency = 0
+        
+        local isKiller = false
+        if player.Team and (player.Team.Name:lower():find("kill") or player.Team.Name:lower():find("slash") or player.Team.Name:lower():find("beast")) then
+            isKiller = true
+        elseif character:FindFirstChildOfClass("Tool") or character:GetAttribute("Role") == "Killer" then
+            isKiller = true
+        end
+
+        if isKiller then
+            txt.Text = "[ МАНЬЯК ]\n" .. player.DisplayName
+            txt.TextColor3 = Color3.fromRGB(255, 30, 30)
+        else
+            txt.Text = "[ Выживший ]\n" .. player.DisplayName
+            txt.TextColor3 = Color3.fromRGB(0, 255, 120)
+        end
+        txt.Parent = bb
+    end
+    player.CharacterAdded:Connect(onChar)
+    if player.Character then onChar(player.Character) end
+end
+
+local function toggleESP(state)
+    if state then
+        for _, p in ipairs(Players:GetPlayers()) do applyPlayerESP(p) end
+        table.insert(connections, Players.PlayerAdded:Connect(applyPlayerESP))
+    else
+        for _, f in pairs(espFolders) do pcall(function() f:Destroy() end) end
+        table.clear(espFolders)
+    end
+end
+
+CreateToggle(VisualsTab, "Подсветка игроков (ESP)", "ESP", toggleESP)
+CreateToggle(VisualsTab, "Кастомный цвет неба (Client)", "CustomSky", applySkyMod)
+
+
+-- [[ НАПОЛНЕНИЕ ВКЛАДКИ: EXPLOITS ]] --
+
+-- Умный авто-скиллчек, целящийся строго в Perfect/White Zone
+local function togglePerfectSkillCheck(state)
+    if not state then return end
+    local pGui = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local function scanUI(descendant)
+        if Config.PerfectSkillCheck and descendant:IsA("GuiObject") then
+            local name = descendant.Name:lower()
+            -- Ищем триггер идеального попадания (обычно разработчики называют его Perfect, Great или White)
+            if name:find("perfect") or name:find("great") or name:find("white") or name:find("bonus") then
+                -- Небольшое смещение тайминга для идеального эмулирования нажатия прямо внутри белой зоны
+                task.wait(0.005) 
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                task.wait(0.01)
+                vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+            end
+        end
+    end
+    table.insert(connections, pGui.DescendantAdded:Connect(scanUI))
+end
+
+CreateToggle(ExploitsTab, "Perfect Auto-Skillcheck (Белая зона)", "PerfectSkillCheck", togglePerfectSkillCheck)
+
+
+-- [[ УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ (INSERT) ]] --
 local MenuVisible = true
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.Insert and not gameProcessed then
         MenuVisible = not MenuVisible
         TweenService:Create(MainFrame, TweenInfo.new(0.15), {
-            Size = MenuVisible and UDim2.new(0, 340, 0, 320) or UDim2.new(0, 340, 0, 0)
+            Size = MenuVisible and UDim2.new(0, 460, 0, 300) or UDim2.new(0, 460, 0, 0)
         }):Play()
     end
 end)
+
+print("[LUNA V4]: Загрузка завершена. Переключайся по вкладкам 'Main', 'Visuals', 'Exploits'!")
