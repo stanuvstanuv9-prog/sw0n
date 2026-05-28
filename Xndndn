@@ -49,8 +49,6 @@ local success, launchError = pcall(function()
         TrailColorValue  = Color3.fromRGB(255, 255, 255),
         TrailMode        = "Default",
         TeleportToDowned = false,
-        WeaponChams      = false,
-        WeaponChamsColor = Color3.fromRGB(255, 50, 50),
         
         -- ЦВЕТА
         ThemeColor       = Color3.fromRGB(0, 180, 255),
@@ -933,56 +931,8 @@ local success, launchError = pcall(function()
         end
     end)
 
-    -- ── Weapon Chams (чамсы на оружие маньяка) ──────────────────────────────
-
-    task.spawn(function()
-        while task.wait(0.15) do
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player == LocalPlayer then continue end
-                local character = player.Character
-                if not character then continue end
-
-                local isKiller = checkIsKiller(player, character)
-
-                -- Сканируем инструменты (оружие) в персонаже и в Backpack
-                local weaponContainers = {character}
-                local backpack = player:FindFirstChild("Backpack")
-                if backpack then
-                    table.insert(weaponContainers, backpack)
-                end
-
-                for _, container in ipairs(weaponContainers) do
-                    for _, item in ipairs(container:GetChildren()) do
-                        if item:IsA("Tool") then
-                            local iName = item.Name:lower()
-                            local isWeapon = not (iName:find("flashlight") or iName:find("medkit")
-                                or iName:find("cola") or iName:find("camera"))
-
-                            local existingHL = item:FindFirstChild("LunaWeaponHL")
-
-                            if Config.WeaponChams and isKiller and isWeapon then
-                                if not existingHL then
-                                    local hl = Instance.new("Highlight")
-                                    hl.Name           = "LunaWeaponHL"
-                                    hl.FillTransparency    = 0.3
-                                    hl.OutlineTransparency = 0
-                                    hl.DepthMode      = Enum.HighlightDepthMode.AlwaysOnTop
-                                    hl.Adornee        = item
-                                    hl.Parent         = item
-                                    existingHL        = hl
-                                end
-                                existingHL.FillColor    = Config.WeaponChamsColor
-                                existingHL.OutlineColor = Color3.new(1, 1, 1)
-                            else
-                                if existingHL then existingHL:Destroy() end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end)
-
+    table.insert(connections, RunService.RenderStepped:Connect(function()
+        local tf = ScreenGui:FindFirstChild("TracerFrame")
         if not tf then
             if Config.Tracers then
                 tf = Instance.new("Frame")
@@ -1113,10 +1063,7 @@ local success, launchError = pcall(function()
     -- ESP Тумблеры со встроенной сменой цвета
     CreateToggle(VisualsTab, "ESP Имена (Выжившие)", "EspSurvivor", nil, true, "EspSurvivorColor")
     CreateToggle(VisualsTab, "ESP Имена (Маньяк)", "EspKiller", nil, true, "EspKillerColor")
-    CreateToggle(VisualsTab, "ESP Подсветка (Chams)", "Box")
-    CreateToggle(VisualsTab, "Weapon Chams (Оружие маньяка)", "WeaponChams", nil, true, "WeaponChamsColor", function(col)
-        Config.WeaponChamsColor = col
-    end)
+    CreateToggle(VisualsTab, "ESP Подсветка (Chams)", "Box") 
     CreateToggle(VisualsTab, "Tracers (Линии к игрокам)", "Tracers")
     CreateToggle(VisualsTab, "Эффект призрака (Ghost)", "GhostEffect", nil, true, "GhostColor")
     
