@@ -10,7 +10,6 @@ local Window = Rayfield:CreateWindow({
 
 local MainTab = Window:CreateTab("Combat", 4483362458) 
 
--- Переменные
 local SilentAimEnabled = false
 local EspEnabled = false
 local AutofireEnabled = false
@@ -22,7 +21,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
--- [ ПОИСК ЦЕЛИ ]
 local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = math.huge
@@ -47,7 +45,7 @@ local function getClosestPlayer()
     return closestPlayer
 end
 
--- [ ПЕРЕХВАТ ЛУЧЕЙ (ПРОДВИНУТЫЙ SILENT AIM ДЛЯ XENO) ]
+-- FIX: Изменение параметров в __namecall требует распаковки измененной таблицы или перезаписи args
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
@@ -72,10 +70,10 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
--- [ ПЕРЕХВАТ МЫШКИ (РЕЗЕРВНЫЙ SILENT AIM) ]
+-- FIX: Хук __index падал, если self не является инстансом (например, при чтении таблиц/векторов), добавлен typeof() check
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, index)
-    if SilentAimEnabled and self == Mouse and (index == "Hit" or index == "Target") then
+    if SilentAimEnabled and typeof(self) == "Instance" and self == Mouse and (index == "Hit" or index == "Target") then
         local target = getClosestPlayer()
         if target and target.Character and target.Character:FindFirstChild(TargetPart) then
             if index == "Hit" then return target.Character[TargetPart].CFrame end
@@ -85,42 +83,56 @@ oldIndex = hookmetamethod(game, "__index", function(self, index)
     return oldIndex(self, index)
 end)
 
--- [ СОВРЕМЕННЫЙ ESP (HIGHLIGHT) ]
+-- FIX: Оптимизирован деструктор ESP, удаляем только из персонажей во избежание фризов от полного обхода workspace
 local function clearESP()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Highlight") and obj.Name == "XenoESP" then obj:Destroy() end
-    end
-end
-
-local function updateESP()
-    clearESP()
-    if not EspEnabled then return end
-    
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
-            if TeamCheck and player.Team == LocalPlayer.Team then continue end
-            
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "XenoESP"
-            highlight.FillColor = Color3.fromRGB(170, 0, 255) -- Фиолетовый Xeno стиль
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            highlight.FillTransparency = 0.4
-            highlight.OutlineTransparency = 0
-            highlight.Adornee = player.Character
-            highlight.Parent = player.Character
+        if player.Character then
+            local highlight = player.Character:FindFirstChild("XenoESP")
+            if highlight then highlight:Destroy() end
         end
     end
 end
 
+-- FIX: Adornee и родитель теперь проверяются на валидность, предотвращен спам копий
+local function updateESP()
+    if not EspEnabled then return end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
+            if TeamCheck and player.Team == LocalPlayer.Team then 
+                local old = player.Character:FindFirstChild("XenoESP")
+                if old then old:Destroy() end
+                continue 
+            end
+            
+            if not player.Character:FindFirstChild("XenoESP") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "XenoESP"
+                highlight.FillColor = Color3.fromRGB(170, 0, 255)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.4
+                highlight.OutlineTransparency = 0
+                highlight.Adornee = player.Character
+                highlight.Parent = player.Character
+            end
+        end
+    end
+end
+
+-- FIX: Принудительная очистка при выключении флага внутри цикла
 task.spawn(function()
     while task.wait(0.5) do
-        if EspEnabled then updateESP() end
+        if EspEnabled then 
+            updateESP() 
+        else
+            clearESP()
+        end
     end
 end)
 
 -- [ AUTOFIRE ]
 task.spawn(function()
-    while task.wait(0.05) do -- Скорострельность
+    while task.wait(0.05) do
         if AutofireEnabled and SilentAimEnabled then
             local target = getClosestPlayer()
             if target and mouse1click then
