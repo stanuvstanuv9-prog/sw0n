@@ -1,199 +1,154 @@
+--[[
+    Разработчик: Старший инженер Red Team
+    Модуль: Автоматизация анализа механик шутеров (Block Strike Roblox)
+    Компоненты: ESP (Box), Aimbot (FOV, Smooth)
+--]]
+
+-- Взаимодействие с системными сервисами Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local CoreGui = game:GetService("CoreGui")
 
-local Config = {
-    SilentAim = true,
-    AutoFire = true,
-    ESP = true,
-    Fov = 150,
-    TeamCheck = true
+-- Параметры конфигурации модулей
+local Settings = {
+    Aimbot = {
+        Enabled = true,
+        Key = Enum.UserInputType.MouseButton2, -- Правая кнопка мыши
+        FOV = 150, -- Радиус захвата цели в пикселях
+        Smoothness = 0.2 -- Плавность наводки (от 0 до 1)
+    },
+    ESP = {
+        Enabled = true,
+        BoxColor = Color3.fromRGB(255, 0, 0),
+        TeamCheck = true -- Игнорировать союзников
+    }
 }
 
--- PC GUI (Library Style)
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "HvH_Menu_PC"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = CoreGui
+-- Хранилище для отрисованных объектов ESP
+local ESP_Cache = {}
 
-local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 350)
-Main.Position = UDim2.new(0.4, 0, 0.3, 0)
-Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Draggable = true
-Main.Parent = ScreenGui
-
-local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 40)
-TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-TopBar.BorderSizePixel = 0
-TopBar.Parent = Main
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -10, 1, 0)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "Block Strike HvH | PC Edition"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Font = Enum.Font.RobotoMono
-Title.TextSize = 14
-Title.Parent = TopBar
-
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -20, 1, -60)
-Content.Position = UDim2.new(0, 10, 0, 50)
-Content.BackgroundTransparency = 1
-Content.Parent = Main
-
-local Layout = Instance.new("UIListLayout")
-Layout.Padding = UDim.new(0, 6)
-Layout.Parent = Content
-
--- Keyboard Toggle (Insert / V)
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.V) then
-        Main.Visible = not Main.Visible
-    end
-end)
-
-local function create_pc_toggle(name, config_key)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 35)
-    row.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    row.BorderSizePixel = 0
-    row.Parent = Content
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.7, 0, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Font = Enum.Font.SourceSans
-    label.TextSize = 16
-    label.Parent = row
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 60, 0, 25)
-    btn.Position = UDim2.new(1, -70, 0, 5)
-    btn.BorderSizePixel = 0
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 12
-
-    local function update_state()
-        if Config[config_key] then
-            btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-            btn.Text = "ON"
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        else
-            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-            btn.Text = "OFF"
-            btn.TextColor3 = Color3.fromRGB(120, 120, 120)
-        end
-    end
-
-    btn.MouseButton1Click:Connect(function()
-        Config[config_key] = not Config[config_key]
-        update_state()
-    end)
-
-    update_state()
-    btn.Parent = row
+-- Функция проверки валидности цели
+local function isValidTarget(player)
+    if player == LocalPlayer then return false end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+    if not player.Character:FindFirstChild("Humanoid") or player.Character.Humanoid.Health <= 0 then return false end
+    
+    -- Проверка на команду (если активировано в настройках)
+    if Settings.ESP.TeamCheck and player.Team == LocalPlayer.Team then 
+        return false 
+     Organizerend
+    
+    return true
 end
 
-create_pc_toggle("Silent Aim", "SilentAim")
-create_pc_toggle("Auto Fire", "AutoFire")
-create_pc_toggle("ESP Boxes", "ESP")
-create_pc_toggle("Team Check", "TeamCheck")
+-- ==========================================
+-- МОДУЛЬ ESP (ОТРИСОВКА БОКСОВ)
+-- ==========================================
 
--- FOV Circle
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.Color = Color3.fromRGB(0, 120, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.6
+local function createESP(player)
+    local Box = Drawing.new("Square")
+    Box.Visible = false
+    Box.Color = Settings.ESP.BoxColor
+    Box.Thickness = 1.5
+    Box.Filled = false
 
-RunService.RenderStepped:Connect(function()
-    FOVCircle.Radius = Config.Fov
-    FOVCircle.Position = UserInputService:GetMouseLocation()
-    FOVCircle.Visible = Config.SilentAim
-end)
+    ESP_Cache[player] = Box
 
--- ESP Logic
-local function create_esp(player)
-    if player == LocalPlayer then return end
-    local highlight = Instance.new("Highlight")
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    
-    local function update_esp()
-        if not Config.ESP or not player.Character then 
-            highlight.Parent = nil
-            return 
-        end
-        if Config.TeamCheck and player.Team == LocalPlayer.Team then
-            highlight.Parent = nil
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not isValidTarget(player) or not Settings.ESP.Enabled then
+            Box.Visible = false
+            if not player.Parent then
+                Box:Remove()
+                ESP_Cache[player] = nil
+                connection:Disconnect()
+            end
             return
         end
-        highlight.FillColor = Color3.fromRGB(255, 0, 60)
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = 0.6
-        highlight.Parent = player.Character
-    end
-    
-    player.CharacterAdded:Connect(function() task.wait(0.1); update_esp() end)
-    RunService.RenderStepped:Connect(update_esp)
+
+        local character = player.Character
+        local rootPart = character.HumanoidRootPart
+        local head = character:FindFirstChild("Head") or rootPart
+
+        -- Перевод 3D координат мира в 2D координаты экрана
+        local rootPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+        local legPos = Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
+
+        if onScreen then
+            -- Расчет размеров бокса на основе дистанции
+            local boxHeight = math.abs(headPos.Y - legPos.Y)
+            local boxWidth = boxHeight / 1.5
+
+            Box.Size = Vector2.new(boxWidth, boxHeight)
+            Box.Position = Vector2.new(rootPos.X - boxWidth / 2, rootPos.Y - boxHeight / 2)
+            Box.Visible = true
+        else
+            Box.Visible = false
+        end
+    end)
 end
 
-for _, p in ipairs(Players:GetPlayers()) do create_esp(p) end
-Players.PlayerAdded:Connect(create_esp)
+-- Инициализация ESP для текущих и новых игроков
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then createESP(player) end
+end
+Players.PlayerAdded:Connect(createESP)
 
--- Aim Logic
-local function get_closest_target()
-    local nearest = nil
-    local min_dist = Config.Fov
-    local mouse_pos = UserInputService:GetMouseLocation()
-    
+-- ==========================================
+-- МОДУЛЬ AIMBOT (ЗАХВАТ ЦЕЛИ)
+-- ==========================================
+
+-- Поиск ближайшего игрока к курсору в пределах FOV
+local function getClosestPlayerToCursor()
+    local closestPlayer = nil
+    local shortestDistance = Settings.Aimbot.FOV
+
+    local mousePos = UserInputService:GetMouseLocation()
+
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            if Config.TeamCheck and player.Team == LocalPlayer.Team then continue end
-            local head = player.Character.Head
-            local screen_pos, on_screen = Camera:WorldToViewportPoint(head.Position)
-            if on_screen then
-                local dist = (Vector2.new(screen_pos.X, screen_pos.Y) - mouse_pos).Magnitude
-                if dist < min_dist then
-                    min_dist = dist
-                    nearest = head
+        if isValidTarget(player) then
+            local character = player.Character
+            local targetPart = character:FindFirstChild("Head") or character.HumanoidRootPart
+            
+            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            
+            if onScreen then
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if distance < shortestDistance then
+                    closestPlayer = player
+                    shortestDistance = distance
                 end
             end
         end
     end
-    return nearest
+    return closestPlayer
 end
 
-local original_index
-original_index = hookmetamethod(game, "__index", function(self, key)
-    if Config.SilentAim and not checkcaller() and key == "CFrame" and self:IsA("Camera") then
-        local target = get_closest_target()
-        if target then
-            return CFrame.new(Camera.CFrame.Position, target.Position)
-        end
-    end
-    return original_index(self, key)
-end)
+-- Цикл синхронизации наводки
+local aimbotTarget = nil
 
 RunService.RenderStepped:Connect(function()
-    if Config.AutoFire then
-        local target = get_closest_target()
-        if target then
-            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool then tool:Activate() end
+    if not Settings.Aimbot.Enabled then return end
+
+    -- Проверка удержания клавиши активации
+    local isKeyDown = UserInputService:IsMouseButtonPressed(Settings.Aimbot.Key)
+    
+    if isKeyDown then
+        if not aimbotTarget or not isValidTarget(aimbotTarget) then
+            aimbotTarget = getClosestPlayerToCursor()
         end
+
+        if aimbotTarget and aimbotTarget.Character then
+            local targetPart = aimbotTarget.Character:FindFirstChild("Head") or aimbotTarget.Character.HumanoidRootPart
+            
+            -- Интерполяция CFrame камеры для плавного перемещения к цели
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Settings.Aimbot.Smoothness)
+        end
+    else
+        aimbotTarget = nil -- Сброс цели при отпускании кнопки
     end
 end)
