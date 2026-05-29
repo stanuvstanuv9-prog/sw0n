@@ -1,29 +1,83 @@
--- Инициализация библиотеки интерфейса Rayfield
+-- Облегченная версия Rayfield без иконок, адаптированная под Solara
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Block Strike HvH | Rage Edition",
-   LoadingTitle = "Обход систем защиты...",
+   Name = "Block Strike HvH | Solara Edition",
+   LoadingTitle = "Сборка хуков...",
    LoadingSubtitle = "by AI Elite",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
--- Сервисы
+-- Создаем вкладку БЕЗ иконки (чистый текст, чтобы Solara не крашилась)
+local MainTab = Window:CreateTab("Rage Функции") 
+
+-- Настройки софта
+local SilentAimEnabled = false
+local EspEnabled = false
+local AutofireEnabled = false
+local TeamCheck = true
+local TargetPart = "Head" 
+local AutofireDelay = 0.05 
+
+-- Сервисы игры
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
--- Переменные софтина
-local SilentAimEnabled = false
-local EspEnabled = false
-local AutofireEnabled = false
-local TeamCheck = true
-local TargetPart = "Head" -- Куда летит сайлент (Head / HumanoidRootPart)
-local AutofireDelay = 0.05 -- Задержка между выстрелами (настройка скорострельности)
+-- [ СОЗДАНИЕ ТУМБЛЕРОВ ]
+MainTab:CreateToggle({
+   Name = "Silent Aim (Аим без доводки)",
+   CurrentValue = false,
+   Callback = function(Value)
+      SilentAimEnabled = Value
+   end,
+})
 
--- [ ПОИСК БЛИЖАЙШЕЙ ЦЕЛИ ]
+MainTab:CreateToggle({
+   Name = "Autofire (Автовыстрел)",
+   CurrentValue = false,
+   Callback = function(Value)
+      AutofireEnabled = Value
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Wallhack / ESP (Подсветка)",
+   CurrentValue = false,
+   Callback = function(Value)
+      EspEnabled = Value
+      if not Value then 
+          -- Очистка ESP при выключении
+          for _, obj in pairs(workspace:GetDescendants()) do
+              if obj:IsA("Highlight") and obj.Name == "HvH_Highlight" then
+                  obj:Destroy()
+              end
+          end
+      end
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Team Check (Игнор тимы)",
+   CurrentValue = true,
+   Callback = function(Value)
+      TeamCheck = Value
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Задержка автофаера",
+   Min = 0.01,
+   Max = 0.3,
+   CurrentValue = 0.05,
+   Callback = function(Value)
+      AutofireDelay = Value
+   end,
+})
+
+-- [ ФУНКЦИЯ ПОИСКА ЦЕЛИ ]
 local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = math.huge
@@ -32,7 +86,6 @@ local function getClosestPlayer()
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(TargetPart) then
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             if humanoid and humanoid.Health > 0 then
-                -- Проверка на тиммейтов
                 if TeamCheck and player.Team == LocalPlayer.Team then continue end
                 
                 local pos, onScreen = Camera:WorldToViewportPoint(player.Character[TargetPart].Position)
@@ -50,66 +103,61 @@ local function getClosestPlayer()
 end
 
 -- [ ХУК МЕТАТАБЛИЦЫ ДЛЯ SILENT AIM ]
-local gmt = getrawmetatable(game)
-setreadonly(gmt, false)
-local oldIndex = gmt.__index
+-- Обернуто в pcall, чтобы если у Solara отвалятся метатаблицы, остальной скрипт работал
+pcall(function()
+    local gmt = getrawmetatable(game)
+    setreadonly(gmt, false)
+    local oldIndex = gmt.__index
 
-gmt.__index = newcclosure(function(self, idx)
-    if self == Mouse and (idx == "Hit" or idx == "Target") and SilentAimEnabled then
-        local target = getClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild(TargetPart) then
-            if idx == "Hit" then
-                return target.Character[TargetPart].CFrame
-            elseif idx == "Target" then
-                return target.Character[TargetPart]
+    gmt.__index = newcclosure(function(self, idx)
+        if self == Mouse and (idx == "Hit" or idx == "Target") and SilentAimEnabled then
+            local target = getClosestPlayer()
+            if target and target.Character and target.Character:FindFirstChild(TargetPart) then
+                if idx == "Hit" then
+                    return target.Character[TargetPart].CFrame
+                elseif idx == "Target" then
+                    return target.Character[TargetPart]
+                end
+            end
+        end
+        return oldIndex(self, idx)
+    end)
+    setreadonly(gmt, true)
+end)
+
+-- [ ПОТОК ДЛЯ ESP ]
+task.spawn(function()
+    while task.wait(0.5) do
+        if EspEnabled then
+            -- Чистим старые чамсы
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Highlight") and obj.Name == "HvH_Highlight" then
+                    obj:Destroy()
+                end
+            end
+            -- Рисуем новые
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                    if TeamCheck and player.Team == LocalPlayer.Team then continue end
+                    
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "HvH_Highlight"
+                    highlight.FillColor = Color3.fromRGB(255, 0, 85)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.3
+                    highlight.Adornee = player.Character
+                    highlight.Parent = player.Character
+                end
             end
         end
     end
-    return oldIndex(self, idx)
-end)
-setreadonly(gmt, true)
-
--- [ ЛОГИКА ESP (CHAMS) ]
-local function clearESP()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Highlight") and obj.Name == "HvH_Highlight" then
-            obj:Destroy()
-        end
-    end
-end
-
-local function updateESP()
-    clearESP()
-    if not EspEnabled then return end
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-            if TeamCheck and player.Team == LocalPlayer.Team then continue end
-            
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "HvH_Highlight"
-            highlight.FillColor = Color3.fromRGB(255, 0, 85) -- Насыщенный кастомный цвет
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            highlight.FillTransparency = 0.3
-            highlight.OutlineTransparency = 0
-            highlight.Adornee = player.Character
-            highlight.Parent = player.Character
-        end
-    end
-end
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if EspEnabled then updateESP() end
-    end
 end)
 
--- [ ЛОГИКА AUTOFIRE (АВТОВЫСТРЕЛ) ]
+-- [ ПОТОК ДЛЯ AUTOFIRE ]
 task.spawn(function()
     while task.wait() do
         if AutofireEnabled then
             local target = getClosestPlayer()
-            -- Если цель найдена и кликер поддерживается вашим исполнителем скриптов
             if target and mouse1click then
                 mouse1click()
                 task.wait(AutofireDelay)
@@ -118,57 +166,9 @@ task.spawn(function()
     end
 end)
 
--- [ СОЗДАНИЕ ИНТЕРФЕЙСА ]
-local MainTab = Window:CreateTab("Rage Функции", 4483362458)
-
-MainTab:CreateToggle({
-   Name = "Silent Aim (Аим без доводки)",
-   CurrentValue = false,
-   Callback = function(Value)
-      SilentAimEnabled = Value
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Autofire (Автовыстрел при наведении)",
-   CurrentValue = false,
-   Callback = function(Value)
-      AutofireEnabled = Value
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Wallhack / ESP (Подсветка игроков)",
-   CurrentValue = false,
-   Callback = function(Value)
-      EspEnabled = Value
-      if not Value then clearESP() end
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Team Check (Игнор тимы)",
-   CurrentValue = true,
-   Callback = function(Value)
-      TeamCheck = Value
-      if EspEnabled then updateESP() end
-   end,
-})
-
-MainTab:CreateSlider({
-   Name = "Задержка автофаера (Скорострельность)",
-   Min = 0.01,
-   Max = 0.3,
-   CurrentValue = 0.05,
-   Flag = "AutofireDelay",
-   Callback = function(Value)
-      AutofireDelay = Value
-   end,
-})
-
+-- Уведомление без иконки
 Rayfield:Notify({
-   Title = "Система готова!",
-   Content = "Включай функции и иди разноси сервер.",
-   Duration = 4,
-   Image = 4483362458,
+   Title = "Система запущена!",
+   Content = "Тумблеры успешно прогружены.",
+   Duration = 3
 })
