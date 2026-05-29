@@ -1,183 +1,199 @@
--- FIX: В дефолтном Rayfield на некоторых эксплоитах вызов :Notify() до полной инициализации 
--- или неверный синтаксис CreateToggle ломает поток выполнения (thread) и скрывает элементы.
--- Полностью переписана структура инициализации UI под строгий синтаксис Rayfield.
-
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
-   Name = "Block Strike HvH | Xeno Edition",
-   LoadingTitle = "Внедрение хуков...",
-   LoadingSubtitle = "by AI Elite",
-   ConfigurationSaving = { Enabled = false },
-   KeySystem = false
-})
-
-local MainTab = Window:CreateTab({
-    Name = "Combat",
-    Image = 4483362458
-})
-
-local SilentAimEnabled = false
-local EspEnabled = false
-local AutofireEnabled = false
-local TeamCheck = true
-local TargetPart = "Head"
-
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
+local CoreGui = game:GetService("CoreGui")
 
-local function getClosestPlayer()
-    local closestPlayer = nil
-    local shortestDistance = math.huge
+local Config = {
+    SilentAim = true,
+    AutoFire = true,
+    ESP = true,
+    Fov = 150,
+    TeamCheck = true
+}
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(TargetPart) then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                if TeamCheck and player.Team == LocalPlayer.Team then continue end
-                
-                local pos, onScreen = Camera:WorldToViewportPoint(player.Character[TargetPart].Position)
-                if onScreen then
-                    local distance = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                    if distance < shortestDistance then
-                        closestPlayer = player
-                        shortestDistance = distance
-                    end
+-- PC GUI (Library Style)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HvH_Menu_PC"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 300, 0, 350)
+Main.Position = UDim2.new(0.4, 0, 0.3, 0)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Block Strike HvH | PC Edition"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.RobotoMono
+Title.TextSize = 14
+Title.Parent = TopBar
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -20, 1, -60)
+Content.Position = UDim2.new(0, 10, 0, 50)
+Content.BackgroundTransparency = 1
+Content.Parent = Main
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 6)
+Layout.Parent = Content
+
+-- Keyboard Toggle (Insert / V)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.V) then
+        Main.Visible = not Main.Visible
+    end
+end)
+
+local function create_pc_toggle(name, config_key)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 35)
+    row.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    row.BorderSizePixel = 0
+    row.Parent = Content
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.SourceSans
+    label.TextSize = 16
+    label.Parent = row
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 60, 0, 25)
+    btn.Position = UDim2.new(1, -70, 0, 5)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 12
+
+    local function update_state()
+        if Config[config_key] then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+            btn.Text = "ON"
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            btn.Text = "OFF"
+            btn.TextColor3 = Color3.fromRGB(120, 120, 120)
+        end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        Config[config_key] = not Config[config_key]
+        update_state()
+    end)
+
+    update_state()
+    btn.Parent = row
+end
+
+create_pc_toggle("Silent Aim", "SilentAim")
+create_pc_toggle("Auto Fire", "AutoFire")
+create_pc_toggle("ESP Boxes", "ESP")
+create_pc_toggle("Team Check", "TeamCheck")
+
+-- FOV Circle
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.fromRGB(0, 120, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.6
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Radius = Config.Fov
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    FOVCircle.Visible = Config.SilentAim
+end)
+
+-- ESP Logic
+local function create_esp(player)
+    if player == LocalPlayer then return end
+    local highlight = Instance.new("Highlight")
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    
+    local function update_esp()
+        if not Config.ESP or not player.Character then 
+            highlight.Parent = nil
+            return 
+        end
+        if Config.TeamCheck and player.Team == LocalPlayer.Team then
+            highlight.Parent = nil
+            return
+        end
+        highlight.FillColor = Color3.fromRGB(255, 0, 60)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.6
+        highlight.Parent = player.Character
+    end
+    
+    player.CharacterAdded:Connect(function() task.wait(0.1); update_esp() end)
+    RunService.RenderStepped:Connect(update_esp)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do create_esp(p) end
+Players.PlayerAdded:Connect(create_esp)
+
+-- Aim Logic
+local function get_closest_target()
+    local nearest = nil
+    local min_dist = Config.Fov
+    local mouse_pos = UserInputService:GetMouseLocation()
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            if Config.TeamCheck and player.Team == LocalPlayer.Team then continue end
+            local head = player.Character.Head
+            local screen_pos, on_screen = Camera:WorldToViewportPoint(head.Position)
+            if on_screen then
+                local dist = (Vector2.new(screen_pos.X, screen_pos.Y) - mouse_pos).Magnitude
+                if dist < min_dist then
+                    min_dist = dist
+                    nearest = head
                 end
             end
         end
     end
-    return closestPlayer
+    return nearest
 end
 
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-
-    if SilentAimEnabled and (method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" or method == "FindPartOnRay" or method == "Raycast") then
-        local target = getClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild(TargetPart) then
-            if method == "Raycast" then
-                local origin = args[1]
-                local direction = (target.Character[TargetPart].Position - origin).unit * 5000
-                args[2] = direction
-                return oldNamecall(self, unpack(args))
-            else
-                local origin = args[1].Origin
-                local direction = (target.Character[TargetPart].Position - origin).unit * 5000
-                args[1] = Ray.new(origin, direction)
-                return oldNamecall(self, unpack(args))
-            end
+local original_index
+original_index = hookmetamethod(game, "__index", function(self, key)
+    if Config.SilentAim and not checkcaller() and key == "CFrame" and self:IsA("Camera") then
+        local target = get_closest_target()
+        if target then
+            return CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end
-    return oldNamecall(self, ...)
+    return original_index(self, key)
 end)
 
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, index)
-    if SilentAimEnabled and typeof(self) == "Instance" and self == Mouse and (index == "Hit" or index == "Target") then
-        local target = getClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild(TargetPart) then
-            if index == "Hit" then return target.Character[TargetPart].CFrame end
-            if index == "Target" then return target.Character[TargetPart] end
-        end
-    end
-    return oldIndex(self, index)
-end)
-
-local function clearESP()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Character then
-            local highlight = player.Character:FindFirstChild("XenoESP")
-            if highlight then highlight:Destroy() end
-        end
-    end
-end
-
-local function updateESP()
-    if not EspEnabled then return end
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") then
-            if TeamCheck and player.Team == LocalPlayer.Team then 
-                local old = player.Character:FindFirstChild("XenoESP")
-                if old then old:Destroy() end
-                continue 
-            end
-            
-            if not player.Character:FindFirstChild("XenoESP") then
-                local highlight = Instance.new("Highlight")
-                highlight.Name = "XenoESP"
-                highlight.FillColor = Color3.fromRGB(170, 0, 255)
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                highlight.FillTransparency = 0.4
-                highlight.OutlineTransparency = 0
-                highlight.Adornee = player.Character
-                highlight.Parent = player.Character
-            end
-        end
-    end
-end
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if EspEnabled then 
-            updateESP() 
-        else
-            clearESP()
+RunService.RenderStepped:Connect(function()
+    if Config.AutoFire then
+        local target = get_closest_target()
+        if target then
+            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool then tool:Activate() end
         end
     end
 end)
-
-task.spawn(function()
-    while task.wait(0.05) do
-        if AutofireEnabled and SilentAimEnabled then
-            local target = getClosestPlayer()
-            if target and mouse1click then
-                mouse1click()
-            end
-        end
-    end
-end)
-
--- FIX: Изменены ключи аргументов 'CurrentValue' -> 'Info' в зависимости от минорной сборки Rayfield,
--- также убран потенциально ломающий UI вызов Notify до рендеринга элементов.
-MainTab:CreateToggle({
-   Name = "Real Silent Aim (Magic Bullet)",
-   Info = "Включение сайлент аима по костям",
-   CurrentValue = false,
-   Callback = function(Value) 
-       SilentAimEnabled = Value 
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Autofire (Стрелять при наведении)",
-   Info = "Автоклик при наличии валидной цели",
-   CurrentValue = false,
-   Callback = function(Value) 
-       AutofireEnabled = Value 
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Chams ESP (Подсветка)",
-   Info = "Включает Highlight силуэты врагов",
-   CurrentValue = false,
-   Callback = function(Value) 
-       EspEnabled = Value 
-       if not Value then clearESP() end
-   end,
-})
-
-MainTab:CreateToggle({
-   Name = "Team Check (Не стрелять по своим)",
-   Info = "Фильтрация игроков вашей команды",
-   CurrentValue = true,
-   Callback = function(Value) 
-       TeamCheck = Value 
-   end,
-})
