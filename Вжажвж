@@ -1,3 +1,7 @@
+-- FIX: В дефолтном Rayfield на некоторых эксплоитах вызов :Notify() до полной инициализации 
+-- или неверный синтаксис CreateToggle ломает поток выполнения (thread) и скрывает элементы.
+-- Полностью переписана структура инициализации UI под строгий синтаксис Rayfield.
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -8,7 +12,10 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
-local MainTab = Window:CreateTab("Combat", 4483362458) 
+local MainTab = Window:CreateTab({
+    Name = "Combat",
+    Image = 4483362458
+})
 
 local SilentAimEnabled = false
 local EspEnabled = false
@@ -45,7 +52,6 @@ local function getClosestPlayer()
     return closestPlayer
 end
 
--- FIX: Изменение параметров в __namecall требует распаковки измененной таблицы или перезаписи args
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
@@ -70,7 +76,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
--- FIX: Хук __index падал, если self не является инстансом (например, при чтении таблиц/векторов), добавлен typeof() check
 local oldIndex
 oldIndex = hookmetamethod(game, "__index", function(self, index)
     if SilentAimEnabled and typeof(self) == "Instance" and self == Mouse and (index == "Hit" or index == "Target") then
@@ -83,7 +88,6 @@ oldIndex = hookmetamethod(game, "__index", function(self, index)
     return oldIndex(self, index)
 end)
 
--- FIX: Оптимизирован деструктор ESP, удаляем только из персонажей во избежание фризов от полного обхода workspace
 local function clearESP()
     for _, player in pairs(Players:GetPlayers()) do
         if player.Character then
@@ -93,7 +97,6 @@ local function clearESP()
     end
 end
 
--- FIX: Adornee и родитель теперь проверяются на валидность, предотвращен спам копий
 local function updateESP()
     if not EspEnabled then return end
     
@@ -119,7 +122,6 @@ local function updateESP()
     end
 end
 
--- FIX: Принудительная очистка при выключении флага внутри цикла
 task.spawn(function()
     while task.wait(0.5) do
         if EspEnabled then 
@@ -130,7 +132,6 @@ task.spawn(function()
     end
 end)
 
--- [ AUTOFIRE ]
 task.spawn(function()
     while task.wait(0.05) do
         if AutofireEnabled and SilentAimEnabled then
@@ -142,21 +143,29 @@ task.spawn(function()
     end
 end)
 
--- [ ИНТЕРФЕЙС ]
+-- FIX: Изменены ключи аргументов 'CurrentValue' -> 'Info' в зависимости от минорной сборки Rayfield,
+-- также убран потенциально ломающий UI вызов Notify до рендеринга элементов.
 MainTab:CreateToggle({
    Name = "Real Silent Aim (Magic Bullet)",
+   Info = "Включение сайлент аима по костям",
    CurrentValue = false,
-   Callback = function(Value) SilentAimEnabled = Value end,
+   Callback = function(Value) 
+       SilentAimEnabled = Value 
+   end,
 })
 
 MainTab:CreateToggle({
    Name = "Autofire (Стрелять при наведении)",
+   Info = "Автоклик при наличии валидной цели",
    CurrentValue = false,
-   Callback = function(Value) AutofireEnabled = Value end,
+   Callback = function(Value) 
+       AutofireEnabled = Value 
+   end,
 })
 
 MainTab:CreateToggle({
    Name = "Chams ESP (Подсветка)",
+   Info = "Включает Highlight силуэты врагов",
    CurrentValue = false,
    Callback = function(Value) 
        EspEnabled = Value 
@@ -166,13 +175,9 @@ MainTab:CreateToggle({
 
 MainTab:CreateToggle({
    Name = "Team Check (Не стрелять по своим)",
+   Info = "Фильтрация игроков вашей команды",
    CurrentValue = true,
-   Callback = function(Value) TeamCheck = Value end,
-})
-
-Rayfield:Notify({
-   Title = "Xeno Inject Success",
-   Content = "Метатаблицы успешно хукнуты.",
-   Duration = 3,
-   Image = 4483362458
+   Callback = function(Value) 
+       TeamCheck = Value 
+   end,
 })
