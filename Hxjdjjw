@@ -22,9 +22,15 @@ do
         JumpEnabled = false,
         NoclipEnabled = false,
         SilentAim = false,
-        SilentAimSmoothness = 0.3,
-        SilentAimFOV = 100,
-        SilentAimHeadshot = true
+        SilentAimSmoothness = 0.1, -- Сделано побыстрее для "на полную"
+        SilentAimFOV = 150,
+        SilentAimHeadshot = true,
+        
+        -- Новые функции
+        AutoCoin = false,
+        AutoFarm = false,
+        AutoGrabGun = false,
+        GunDropEsp = true
     };
 
     local playerRoles = {};
@@ -178,14 +184,14 @@ do
     CloseCorner.CornerRadius = UDim.new(0, 8);
     CloseCorner.Parent = CloseBtn;
 
-    -- Мобильная полоска снизу (как на iPhone / Android) для вызова меню
+    -- Мобильная полоска снизу для вызова меню
     local HomeBarContainer = Instance.new("Frame")
     HomeBarContainer.Name = "HomeBarContainer"
     HomeBarContainer.Size = UDim2.new(0, 140, 0, 12)
-    HomeBarContainer.Position = UDim2.new(0.5, -70, 1, -20) -- Позиция в самом низу экрана
+    HomeBarContainer.Position = UDim2.new(0.5, -70, 1, -20)
     HomeBarContainer.BackgroundTransparency = 1
     HomeBarContainer.Active = true
-    HomeBarContainer.Visible = false -- Изначально скрыта, пока открыто меню
+    HomeBarContainer.Visible = false
     HomeBarContainer.Parent = sg
 
     local HomeBar = Instance.new("TextButton")
@@ -202,7 +208,6 @@ do
     HomeBarCorner.CornerRadius = UDim.new(1, 0)
     HomeBarCorner.Parent = HomeBar
 
-    -- Обработка кнопки закрытия (Крестик) — скрывает меню и показывает полоску
     CloseBtn.MouseEnter:Connect(function()
         TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(200, 60, 60), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play();
     end);
@@ -214,7 +219,6 @@ do
         HomeBarContainer.Visible = true
     end);
 
-    -- Клик по полоске снизу — открывает меню обратно и прячет полоску
     HomeBar.MouseButton1Click:Connect(function()
         HomeBarContainer.Visible = false
         MainFrame.Visible = true
@@ -613,26 +617,25 @@ do
         end);
     end
 
+    -- Наполнение страниц кнопками
     createToggle(EspPage, "Master Role ESP", _G.EspEnabled, function(v) _G.EspEnabled = v; end);
+    createToggle(EspPage, "Gun Drop ESP", _G.GunDropEsp, function(v) _G.GunDropEsp = v; end); -- Добавлено
+
     createToggle(CombatPage, "Murderer Kill Aura", _G.KillAura, function(v) _G.KillAura = v; end);
     createTextBox(CombatPage, "Радиус ауры убийства", "75", function(v) _G.KillAuraRadius = v; end);
+    createToggle(CombatPage, "Sheriff Silent Aim на полную", _G.SilentAim, function(v) _G.SilentAim = v; end); -- Добавлено
+    createSlider(CombatPage, "Silent Aim FOV", 50, 500, 150, function(v) _G.SilentAimFOV = v; end); -- Добавлено
+
     createToggle(MovePage, "Взлом скорости", _G.SpeedEnabled, function(v) _G.SpeedEnabled = v; end);
     createTextBox(MovePage, "Значение скорости ходьбы", "16", function(v) _G.WalkSpeedValue = v; end);
     createToggle(MovePage, "Взлом прыжка", _G.JumpEnabled, function(v) _G.JumpEnabled = v; end);
     createTextBox(MovePage, "Значение силы прыжка", "50", function(v) _G.JumpPowerValue = v; end);
+    createToggle(MovePage, "Noclip", _G.NoclipEnabled, function(v) _G.NoclipEnabled = v; end);
     
-    createToggle(MovePage, "Noclip", _G.NoclipEnabled, function(v)
-        _G.NoclipEnabled = v;
-        if (v and LocalPlayer.Character) then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false; end
-            end
-        elseif LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = true; end
-            end
-        end
-    end);
+    -- Новые переключатели автоматизации в Перемещении
+    createToggle(MovePage, "Auto-Collect Coins (Сбор монет)", _G.AutoCoin, function(v) _G.AutoCoin = v; end); -- Добавлено
+    createToggle(MovePage, "Auto-Win / AFK Farm", _G.AutoFarm, function(v) _G.AutoFarm = v; end); -- Добавлено
+    createToggle(MovePage, "Auto-Grab Gun (Подбор пистолета)", _G.AutoGrabGun, function(v) _G.AutoGrabGun = v; end); -- Добавлено
 
     createActionButton(TeleportPage, "📡 TP to Murderer", function()
         for _, player in ipairs(Players:GetPlayers()) do
@@ -702,11 +705,12 @@ do
     end);
 
     createToggleButton(TrollingPage, "🌀 Fling Sheriff", false, function(state)
-        if state then flingMurdererActive = false; flingSheriffActive = true; startFling(); else flingSheriffActive = false; stopFling(); end
+        if state then flingMurdererActive = false; flingSheriffActive = true; startFling(); else flingMurdererActive = false; stopFling(); end
     end);
 
     createSlider(TrollingPage, "💥 Fling Power", 200, 800, 400, function(v) flingStrength = v; end);
 
+    -- Потоки симуляции физ-свойств (Noclip, Speed, Jump)
     RunService.Stepped:Connect(function()
         if (_G.NoclipEnabled and LocalPlayer.Character) then
             for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
@@ -735,6 +739,7 @@ do
         end
     end);
 
+    -- Silent Aim Функционал
     local function getClosestPlayerInFOV()
         if (not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return nil; end
         local camera = Workspace.CurrentCamera;
@@ -743,16 +748,19 @@ do
 
         for _, player in ipairs(Players:GetPlayers()) do
             if ((player ~= LocalPlayer) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid")) then
-                local targetHrp = player.Character.HumanoidRootPart;
-                local targetHum = player.Character.Humanoid;
-                if (targetHum.Health > 0) then
-                    local screenPos, onScreen = camera:WorldToScreenPoint(targetHrp.Position);
-                    if onScreen then
-                        local mousePos = UserInputService:GetMouseLocation();
-                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude;
-                        if ((distance <= _G.SilentAimFOV) and (distance < closestDistance)) then
-                            closestDistance = distance;
-                            closestPlayer = player;
+                -- Аим целится только в маньяка, если мы шериф
+                if playerRoles[player.Name] == "Murderer" then
+                    local targetHrp = player.Character.HumanoidRootPart;
+                    local targetHum = player.Character.Humanoid;
+                    if (targetHum.Health > 0) then
+                        local screenPos, onScreen = camera:WorldToScreenPoint(targetHrp.Position);
+                        if onScreen then
+                            local mousePos = UserInputService:GetMouseLocation();
+                            local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude;
+                            if ((distance <= _G.SilentAimFOV) and (distance < closestDistance)) then
+                                closestDistance = distance;
+                                closestPlayer = player;
+                            end
                         end
                     end
                 end
@@ -792,11 +800,10 @@ do
                                     if targetPos then
                                         local camera = Workspace.CurrentCamera;
                                         local oldCFrame = camera.CFrame;
-                                        local direction = (targetPos - camera.CFrame.Position).Unit;
-                                        local newCFrame = CFrame.lookAt(camera.CFrame.Position, camera.CFrame.Position + direction);
-                                        camera.CFrame = oldCFrame:Lerp(newCFrame, 1 - _G.SilentAimSmoothness);
+                                        -- Жесткий Aim "на полную" — моментальный фокус взгляда на цель
+                                        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetPos);
                                         oldMouse();
-                                        task.wait(0.05);
+                                        task.wait(0.02);
                                         camera.CFrame = oldCFrame;
                                         return;
                                     end
@@ -812,6 +819,7 @@ do
     setupSilentAim();
     LocalPlayer.CharacterAdded:Connect(setupSilentAim);
 
+    -- Kill Aura поток
     task.spawn(function()
         local lastAttackTime = 0;
         local attackCooldown = 0.1;
@@ -869,6 +877,7 @@ do
         end
     end);
 
+    -- Функции логгинга ролей и ESP
     local function applyHighlight(player, role)
         local character = player.Character;
         if (not character or not _G.EspEnabled) then
@@ -911,12 +920,63 @@ do
         return nil;
     end
 
+    -- [НОВЫЙ ЦИКЛ]: Логика автоматизации (Auto-Coin, Auto-Farm, Gun Drop ESP, Auto-Grab Gun)
+    task.spawn(function()
+        while true do
+            local character = LocalPlayer.Character
+            local hrp = character and character:FindFirstChild("HumanoidRootPart")
+            
+            if hrp then
+                -- 1. Auto-Grab Gun & Gun Drop ESP
+                local gunDrop = Workspace:FindFirstChild("GunDrop")
+                if gunDrop and gunDrop:IsA("BasePart") then
+                    -- Подсветка выпавшего пистолета
+                    if _G.GunDropEsp then
+                        local gEsp = gunDrop:FindFirstChild("GunESP") or Instance.new("Highlight")
+                        gEsp.Name = "GunESP"
+                        gEsp.Parent = gunDrop
+                        gEsp.FillColor = COLORS.DroppedGun
+                        gEsp.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        gEsp.Enabled = true
+                    end
+                    -- Автоподбор пистолета
+                    if _G.AutoGrabGun and playerRoles[LocalPlayer.Name] ~= "Murderer" then
+                        hrp.CFrame = gunDrop.CFrame
+                    end
+                end
+
+                -- 2. Auto-Collect Coins (Безопасный сбор монет через плавный телепорт к ним)
+                if _G.AutoCoin and not _G.AutoFarm then
+                    local mainContainer = Workspace:FindFirstChild("Normal") or Workspace:FindFirstChild("Hardcore")
+                    local coinContainer = mainContainer and mainContainer:FindFirstChild("CoinContainer")
+                    if coinContainer then
+                        for _, coin in ipairs(coinContainer:GetChildren()) do
+                            if coin:IsA("BasePart") or coin:FindFirstChild("CoinVisual") then
+                                hrp.CFrame = coin.CFrame
+                                task.wait(0.1) -- Небольшая задержка, чтобы сервер засчитал сбор монет
+                                break
+                            end
+                        end
+                    end
+                end
+
+                -- 3. Auto-Win / AFK Farm (Телепорт под карту в безопасную зону для фарма побед)
+                if _G.AutoFarm then
+                    hrp.CFrame = CFrame.new(0, -150, 0)
+                    if hrp.AssemblyLinearVelocity.Magnitude > 0 then
+                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0) -- Защита от античитов на скорость во время фарма
+                    end
+                end
+            end
+            task.wait(0.2);
+        end
+    end)
+
+    -- Поток отслеживания игроков для ESP ролей
     task.spawn(function()
         while true do
             for _, player in ipairs(Players:GetPlayers()) do
                 if (player.Character and player.Character:FindFirstChild("HumanoidRootPart") and (player ~= LocalPlayer)) then
-                    local hrp = player.Character.HumanoidRootPart;
-                    local hum = player.Character:FindFirstChildOfClass("Humanoid");
                     if not _G.EspEnabled then
                         if player.Character:FindFirstChild("RoleESP") then player.Character.RoleESP:Destroy(); end
                     else
@@ -936,6 +996,7 @@ do
         end
     end);
 
+    -- Перехватчик удаленных событий MM2 для точного определения ролей на старте
     local gameplayFolder = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Gameplay");
     if gameplayFolder then
         local roundStart = gameplayFolder:FindFirstChild("RoundStart");
@@ -993,5 +1054,5 @@ do
         playerRoles[player.Name] = nil;
     end);
 
-    print("⚡ MM2 PRESTIGE XENO V4 READY");
+    print("⚡ MM2 PRESTIGE XENO V4 MODDED READY");
 end
