@@ -1,0 +1,788 @@
+-- =============================================================================
+-- ЧАСТЬ 1: ИНИЦИАЛИЗАЦИЯ, СЕРВИСЫ, УТИЛИТЫ И ОСНОВА GUI
+-- =============================================================================
+
+repeat task.wait() until game:IsLoaded()
+
+-- Таблицы для кастомных биндов (избавит от конфликтов с хоткеями)
+local BlacklistedKeys = {
+	Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+	Enum.KeyCode.LeftShift, Enum.KeyCode.Space, Enum.KeyCode.BackSlash,
+	Enum.KeyCode.Return, Enum.KeyCode.CapsLock, Enum.KeyCode.Unknown
+}
+
+local Numbers = {
+	["One"] = 1, ["Two"] = 2, ["Three"] = 3, ["Four"] = 4, ["Five"] = 5,
+	["Six"] = 6, ["Seven"] = 7, ["Eight"] = 8, ["Nine"] = 9, ["Zero"] = 0,
+	["Minus"] = "-", ["Equals"] = "=", ["Backquote"] = "`", ["Comma"] = ",",
+	["Slash"] = "/", ["Semicolon"] = ";", ["LeftBracket"] = "[",
+	["RightBracket"] = "]", ["Quote"] = "'"
+}
+
+local NumberIndex = {}
+for i, v in pairs(Numbers) do
+	if not table.find(NumberIndex, tostring(i)) then
+		table.insert(NumberIndex, i)
+	end
+end
+
+-- Кэширование сервисов и игрока
+local Client = game.Players.LocalPlayer
+local Mouse = Client:GetMouse()
+local UIS = game:GetService("UserInputService")
+local Run = game:GetService("RunService")
+local Tween = game:GetService("TweenService")
+local TI = TweenInfo.new
+
+-- Глобальные таблицы для кастомной логики скриптов
+getgenv().Whitelisted = {}
+getgenv().Targets = {}
+
+-- Модуль утилит (анимации, сортировки, эффекты)
+local Util = {}
+
+function Util:Tween(instance, properties, duration, ...)
+	if not instance then return end
+	Tween:Create(instance, TI(duration, ...), properties):Play()
+end
+
+function Util:Sort(pattern, values)
+	local new = {}
+	pattern = pattern:lower()
+	if pattern == "" then return values end
+	for i, value in pairs(values) do
+		if tostring(value):lower():find(pattern) then
+			table.insert(new, value)
+		end
+	end
+	return new
+end
+
+-- Эффект волны (Ripple Effect) при клике на кнопки
+function Util:Ripple(button)
+	local background = button:WaitForChild("Background", 1)
+	if not background then return end
+
+	button.MouseButton1Down:Connect(function()
+		local mousePos = UIS:GetMouseLocation()
+		local relativePos = mousePos - button.AbsolutePosition
+
+		local circle = Instance.new("Frame")
+		local corner = Instance.new("UICorner")
+		circle.AnchorPoint = Vector2.new(0.5, 0.5)
+		circle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		circle.BackgroundTransparency = 0.8
+		circle.Size = UDim2.new(0, 0, 0, 0)
+		-- Смещение -36 учитывает стандартный верхний бар Roblox
+		circle.Position = UDim2.new(0, relativePos.X, 0, relativePos.Y - 36)
+		
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = circle
+		circle.Parent = background
+
+		Tween:Create(circle, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, 250, 0, 250)
+		}):Play()
+		
+		task.delay(0.2, function()
+			Tween:Create(circle, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+			task.wait(0.3)
+			circle:Destroy()
+		end)
+	end)
+end
+
+-- Адаптивный скрипт перетаскивания (Поддержка ПК-мыши и Touch-ввода для Delta/Hydrogen)
+local function Draggify(frame)
+	local dragging, dragInput, dragStart, startPos
+	
+	local function Update(input)
+		local delta = input.Position - dragStart
+		Util:Tween(frame, {
+			Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		}, 0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+	
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+			
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then 
+					dragging = false 
+				end
+			end)
+		end
+	end)
+	
+	frame.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	
+	UIS.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then 
+			Update(input) 
+		end
+	end)
+end
+
+-- Безопасный поиск CoreGui (Защита от краша на мобильных читах Delta, Hydrogen)
+local UI_PARENT = game:GetService("CoreGui")
+pcall(function()
+	if not UI_PARENT or #UI_PARENT:GetChildren() == 0 then 
+		UI_PARENT = Client:WaitForChild("PlayerGui") 
+	end
+end)
+
+-- Создаем базовый объект библиотеки
+local WindowTable = {} 
+local LibName = "DrifterLib_" .. tostring(math.random(1000, 9999))
+local FirstPage = false
+
+-- Очистка старых интерфейсов перед запуском нового
+for _, v in pairs(UI_PARENT:GetChildren()) do
+	if v.Name:match("DrifterLib") then 
+		v:Destroy() 
+	end
+end
+
+-- Инициализация ScreenGui
+local screenGui = Instance.new("ScreenGui", UI_PARENT)
+screenGui.Name = LibName
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- =============================================================================
+-- ЧАСТЬ 2: СОЗДАНИЕ ОКНА, МОБИЛЬНОЙ КНОПКИ И БОКОВЫХ ПАНЕЛЕЙ
+-- =============================================================================
+
+function WindowTable:CreateWindow(config)
+	config = config or {}
+	local Title = config.Title or "Ar Du Galen"
+
+	-- 1. МОБИЛЬНАЯ КНОПКА ОТКРЫТИЯ/ЗАКРЫТИЯ (iPhone Pill / Dynamic Island Style)
+	local MobileToggle = Instance.new("TextButton")
+	local MobileCorner = Instance.new("UICorner")
+	local MobileStroke = Instance.new("UIStroke")
+
+	MobileToggle.Name = "MobileToggle"
+	MobileToggle.Parent = screenGui
+	MobileToggle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	MobileToggle.Size = UDim2.new(0, 100, 0, 12)
+	MobileToggle.Position = UDim2.new(0.5, -50, 0, 15) -- Аккуратная полоска вверху экрана
+	MobileToggle.Text = ""
+	MobileToggle.ZIndex = 100
+	Draggify(MobileToggle) -- Можно свободно перетаскивать по экрану на мобилке
+
+	MobileCorner.CornerRadius = UDim.new(1, 0)
+	MobileCorner.Parent = MobileToggle
+
+	MobileStroke.Color = Color3.fromRGB(80, 80, 80)
+	MobileStroke.Thickness = 1
+	MobileStroke.Transparency = 0.3
+	MobileStroke.Parent = MobileToggle
+
+	-- Value для хранения выбранного игрока из списка
+	local SelectedPlayer = Instance.new("StringValue", screenGui)
+	SelectedPlayer.Name = 'SelectedPlayer'
+
+	-- 2. ГЛАВНЫЙ КОНТЕЙНЕР ИНТЕРФЕЙСА (MainUI)
+	local MainUI = Instance.new("Frame", screenGui)
+	local MainCorner = Instance.new("UICorner")
+
+	MainUI.Name = 'MainUI'
+	MainUI.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	MainUI.Position = UDim2.new(0.5, -271, 0.5, -172)
+	MainUI.Size = UDim2.new(0, 543, 0, 344)
+	MainUI.ClipsDescendants = false
+	Draggify(MainUI)
+
+	MainCorner.CornerRadius = UDim.new(0, 6)
+	MainCorner.Parent = MainUI
+
+	-- Логика скрытия/открытия меню при нажатии на полоску-кнопку
+	local uiVisible = true
+	MobileToggle.MouseButton1Click:Connect(function()
+		uiVisible = not uiVisible
+		MainUI.Visible = uiVisible
+	end)
+
+	-- 3. ВЕРХНЯЯ ШАПКА ИНТЕРФЕЙСА (TopRow)
+	local TopRow = Instance.new("Frame", MainUI)
+	TopRow.Name = "TopRow"
+	TopRow.BackgroundTransparency = 1
+	TopRow.Size = UDim2.new(1, 0, 0, 35)
+
+	local ArrowButton = Instance.new("TextButton", TopRow)
+	ArrowButton.Name = "SidebarToggle"
+	ArrowButton.BackgroundTransparency = 1
+	ArrowButton.Size = UDim2.new(0, 35, 0, 35)
+	ArrowButton.Font = Enum.Font.SourceSansBold
+	ArrowButton.Text = "☰"
+	ArrowButton.TextColor3 = Color3.new(1, 1, 1)
+	ArrowButton.TextSize = 20
+
+	local TitleLabel = Instance.new("TextLabel", TopRow)
+	TitleLabel.Name = "TitleLabel"
+	TitleLabel.BackgroundTransparency = 1
+	TitleLabel.Position = UDim2.new(0, 40, 0, 0)
+	TitleLabel.Size = UDim2.new(0, 270, 0, 35)
+	TitleLabel.Font = Enum.Font.SourceSansSemibold
+	TitleLabel.Text = Title
+	TitleLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+	TitleLabel.TextSize = 18
+	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- 4. ВЫДВИЖНОЙ САЙДБАР ДЛЯ ВКЛАДОК (Sidebar)
+	local Sidebar = Instance.new("Frame", MainUI)
+	local SidebarCorner = Instance.new("UICorner")
+	local SidebarScroll = Instance.new("ScrollingFrame", Sidebar)
+	local SidebarLayout = Instance.new("UIListLayout", SidebarScroll)
+	local SidebarPadding = Instance.new("UIPadding", SidebarScroll)
+
+	Sidebar.Name = "Sidebar"
+	Sidebar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	Sidebar.Position = UDim2.new(0, -140, 0, 0) -- Изначально спрятан слева за экраном
+	Sidebar.Size = UDim2.new(0, 130, 1, 0)
+	Sidebar.ZIndex = 10
+
+	SidebarCorner.CornerRadius = UDim.new(0, 6)
+	SidebarCorner.Parent = Sidebar
+
+	SidebarScroll.BackgroundTransparency = 1
+	SidebarScroll.Size = UDim2.new(1, 0, 1, 0)
+	SidebarScroll.ScrollBarThickness = 0
+	SidebarScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	SidebarScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+	SidebarLayout.Padding = UDim.new(0, 6)
+	SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	SidebarPadding.PaddingTop = UDim.new(0, 40) -- Отступ сверху, чтобы не перекрывать кнопку ☰
+	SidebarPadding.PaddingLeft = UDim.new(0, 7)
+
+	-- Логика анимации открытия/закрытия сайдбара
+	local sidebarOpen = false
+	ArrowButton.MouseButton1Click:Connect(function()
+		sidebarOpen = not sidebarOpen
+		local targetPos = sidebarOpen and UDim2.new(0, 0, 0, 0) or UDim2.new(0, -140, 0, 0)
+		Util:Tween(Sidebar, {Position = targetPos}, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end)
+
+	-- Основная зона, куда будут рендериться элементы страниц
+	local PageHolder = Instance.new("Frame", MainUI)
+	PageHolder.Name = "PageHolder"
+	PageHolder.BackgroundTransparency = 1
+	PageHolder.Position = UDim2.new(0, 10, 0, 40)
+	PageHolder.Size = UDim2.new(0, 315, 1, -50)
+
+	-- 5. ПРАВАЯ ПАНЕЛЬ ИГРОКОВ С ПОИСКОМ (RightPanel / Player List)
+	local RightPanel = Instance.new("Frame", MainUI)
+	local RPCorner = Instance.new("UICorner")
+	local SearchBox = Instance.new("TextBox", RightPanel)
+	local SBCorner = Instance.new("UICorner")
+	local PlayerListScroll = Instance.new("ScrollingFrame", RightPanel)
+	local PListLayout = Instance.new("UIListLayout", PlayerListScroll)
+	local PListPadding = Instance.new("UIPadding", PlayerListScroll)
+
+	RightPanel.Name = "RightPanel"
+	RightPanel.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+	RightPanel.Position = UDim2.new(0, 335, 0, 40)
+	RightPanel.Size = UDim2.new(0, 198, 1, -50)
+
+	RPCorner.CornerRadius = UDim.new(0, 6)
+	RPCorner.Parent = RightPanel
+
+	SearchBox.Name = "SearchBox"
+	SearchBox.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+	SearchBox.Position = UDim2.new(0.05, 0, 0.04, 0)
+	SearchBox.Size = UDim2.new(0.9, 0, 0, 26)
+	SearchBox.Font = Enum.Font.SourceSans
+	SearchBox.PlaceholderText = "Поиск игрока..."
+	SearchBox.Text = ""
+	SearchBox.TextColor3 = Color3.new(1, 1, 1)
+	SearchBox.TextSize = 14
+	SearchBox.ClipsDescendants = true
+
+	SBCorner.CornerRadius = UDim.new(0, 4)
+	SBCorner.Parent = SearchBox
+
+	PlayerListScroll.Name = "PlayerListScroll"
+	PlayerListScroll.BackgroundTransparency = 1
+	PlayerListScroll.Position = UDim2.new(0, 0, 0.18, 0)
+	PlayerListScroll.Size = UDim2.new(1, 0, 0.82, 0)
+	PlayerListScroll.ScrollBarThickness = 2
+	PlayerListScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0)
+	PlayerListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	PlayerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+	PListLayout.Padding = UDim.new(0, 4)
+	PListLayout.SortOrder = Enum.SortOrder.Name
+
+	PListPadding.PaddingLeft = UDim.new(0, 10)
+	PListPadding.PaddingRight = UDim.new(0, 10)
+
+	-- Динамическое обновление списка игроков с поисковым фильтром
+	local function UpdatePlayerList()
+		for _, child in pairs(PlayerListScroll:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+		
+		local text = SearchBox.Text
+		local playerNames = {}
+		for _, p in pairs(game.Players:GetPlayers()) do
+			if p ~= Client then table.insert(playerNames, p.Name) end
+		end
+		
+		for _, name in pairs(Util:Sort(text, playerNames)) do
+			local pBtn = Instance.new("TextButton", PlayerListScroll)
+			local pBtnCorner = Instance.new("UICorner")
+			
+			pBtn.Size = UDim2.new(1, 0, 0, 26)
+			pBtn.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
+			pBtn.Font = Enum.Font.SourceSansSemibold
+			pBtn.Text = "  " .. name
+			pBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+			pBtn.TextSize = 14
+			pBtn.TextXAlignment = Enum.TextXAlignment.Left
+			
+			pBtnCorner.CornerRadius = UDim.new(0, 4)
+			pBtnCorner.Parent = pBtn
+			
+			pBtn.MouseButton1Click:Connect(function()
+				SelectedPlayer.Value = name
+				-- Визуальная подсвечивание выбранного игрока
+				for _, b in pairs(PlayerListScroll:GetChildren()) do
+					if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(48, 48, 48) end
+				end
+				pBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			end)
+		end
+	end
+
+	SearchBox:GetPropertyChangedSignal("Text"):Connect(UpdatePlayerList)
+	game.Players.PlayerAdded:Connect(UpdatePlayerList)
+	game.Players.PlayerRemoving:Connect(UpdatePlayerList)
+	UpdatePlayerList()
+
+	-- Хэндлер для регистрации вкладок (логику пишем в Части 3)
+	local Elements = {}
+-- =============================================================================
+-- ЧАСТЬ 3: СОЗДАНИЕ СТРАНИЦ (PAGES) И ОСНОВНЫХ ЭЛЕМЕНТОВ (КНОПКИ, ПЕРЕКЛЮЧАТЕЛИ, ПОЛЗУНКИ, ДРОПДАУНЫ)
+-- =============================================================================
+
+	function Elements:CreatePage(pageName)
+		pageName = pageName or "Вкладка"
+
+		-- 1. Кнопка переключения вкладки в сайдбаре
+		local TabBtn = Instance.new("TextButton", SidebarScroll)
+		local TabBtnCorner = Instance.new("UICorner")
+
+		TabBtn.Name = pageName .. "_Btn"
+		TabBtn.Size = UDim2.new(1, -10, 0, 30)
+		TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+		TabBtn.Font = Enum.Font.SourceSansSemibold
+		TabBtn.Text = pageName
+		TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+		TabBtn.TextSize = 14
+
+		TabBtnCorner.CornerRadius = UDim.new(0, 4)
+		TabBtnCorner.Parent = TabBtn
+
+		-- 2. Контейнер для элементов этой конкретной страницы
+		local PageContent = Instance.new("ScrollingFrame", PageHolder)
+		local PageLayout = Instance.new("UIListLayout", PageContent)
+		local PagePadding = Instance.new("UIPadding", PageContent)
+
+		PageContent.Name = pageName .. "_Content"
+		PageContent.Size = UDim2.new(1, 0, 1, 0)
+		PageContent.BackgroundTransparency = 1
+		PageContent.Visible = false
+		PageContent.ScrollBarThickness = 2
+		PageContent.ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0)
+		PageContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+		PageContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+		PageLayout.Padding = UDim.new(0, 8)
+		PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+		PagePadding.PaddingTop = UDim.new(0, 5)
+		PagePadding.PaddingBottom = UDim.new(0, 5)
+
+		-- Делаем первую созданную страницу активной по умолчанию
+		if not FirstPage then
+			FirstPage = true
+			PageContent.Visible = true
+			TabBtn.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+			TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		end
+
+		-- Логика переключения вкладок в меню
+		TabBtn.MouseButton1Click:Connect(function()
+			for _, p in pairs(PageHolder:GetChildren()) do
+				if p:IsA("ScrollingFrame") then p.Visible = false end
+			end
+			for _, b in pairs(SidebarScroll:GetChildren()) do
+				if b:IsA("TextButton") then 
+					b.BackgroundColor3 = Color3.fromRGB(45, 45, 45) 
+					b.TextColor3 = Color3.fromRGB(200, 200, 200)
+				end
+			end
+			PageContent.Visible = true
+			TabBtn.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+			TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		end)
+
+		local PageComponents = {}
+
+		-- КНОПКА (Button) с эффектом волны при нажатии
+		function PageComponents:AddButton(btnText, callback)
+			btnText = btnText or "Кнопка"
+			callback = callback or function() end
+
+			local btn = Instance.new("TextButton", PageContent)
+			local btnCorner = Instance.new("UICorner")
+			local bg = Instance.new("Frame", btn)
+
+			btn.Size = UDim2.new(1, -5, 0, 32)
+			btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			btn.Font = Enum.Font.SourceSansSemibold
+			btn.Text = btnText
+			btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+			btn.TextSize = 14
+
+			btnCorner.CornerRadius = UDim.new(0, 4)
+			btnCorner.Parent = btn
+
+			bg.Name = "Background"
+			bg.Size = UDim2.new(1, 0, 1, 0)
+			bg.BackgroundTransparency = 1
+			bg.ZIndex = 0
+			Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 4)
+
+			Util:Ripple(btn)
+			btn.MouseButton1Click:Connect(function() task.spawn(callback) end)
+		end
+
+		-- ПЕРЕКЛЮЧАТЕЛЬ (Toggle) со стильной плавной анимацией
+		function PageComponents:CreateToggle(config)
+			config = config or {}
+			local Title = config.Title or "Переключатель"
+			local Callback = config.Callback or function() end
+			local State = config.Default or false
+
+			local ToggleFrame = Instance.new("TextButton", PageContent)
+			local TFCorner = Instance.new("UICorner")
+			local Indicator = Instance.new("Frame", ToggleFrame)
+			local IndCorner = Instance.new("UICorner")
+			local IndCircle = Instance.new("Frame", Indicator)
+
+			ToggleFrame.Size = UDim2.new(1, -5, 0, 32)
+			ToggleFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			ToggleFrame.Font = Enum.Font.SourceSansSemibold
+			ToggleFrame.Text = "  " .. Title
+			ToggleFrame.TextColor3 = Color3.fromRGB(240, 240, 240)
+			ToggleFrame.TextSize = 14
+			ToggleFrame.TextXAlignment = Enum.TextXAlignment.Left
+
+			TFCorner.CornerRadius = UDim.new(0, 4)
+			TFCorner.Parent = ToggleFrame
+
+			Indicator.Size = UDim2.new(0, 34, 0, 18)
+			Indicator.Position = UDim2.new(1, -44, 0.5, -9)
+			Indicator.BackgroundColor3 = State and Color3.fromRGB(60, 180, 100) or Color3.fromRGB(180, 60, 60)
+
+			IndCorner.CornerRadius = UDim.new(1, 0)
+			IndCorner.Parent = Indicator
+
+			Instance.new("UICorner", IndCircle).CornerRadius = UDim.new(1, 0)
+			IndCircle.Size = UDim2.new(0, 14, 0, 14)
+			IndCircle.Position = State and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+			IndCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+
+			ToggleFrame.MouseButton1Click:Connect(function()
+				State = not State
+				local targetColor = State and Color3.fromRGB(60, 180, 100) or Color3.fromRGB(180, 60, 60)
+				local targetPos = State and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+				
+				Util:Tween(Indicator, {BackgroundColor3 = targetColor}, 0.2)
+				Util:Tween(IndCircle, {Position = targetPos}, 0.15)
+				task.spawn(Callback, State)
+			end)
+		end
+
+		-- ПОЛЗУНОК (Slider) — полная поддержка Touch-ввода (Delta/Hydrogen)
+		function PageComponents:CreateSlider(config)
+			config = config or {}
+			local Title = config.Text or config.Title or "Ползунок"
+			local Min = config.Min or 0
+			local Max = config.Max or 100
+			local Def = config.Default or Min
+			local Callback = config.Callback or function() end
+
+			local SliderFrame = Instance.new("Frame", PageContent)
+			local SFCorner = Instance.new("UICorner")
+			local Label = Instance.new("TextLabel", SliderFrame)
+			local BarBg = Instance.new("TextButton", SliderFrame)
+			local BBCorner = Instance.new("UICorner")
+			local Fill = Instance.new("Frame", BarBg)
+			local FillCorner = Instance.new("UICorner")
+
+			SliderFrame.Size = UDim2.new(1, -5, 0, 45)
+			SliderFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			SFCorner.CornerRadius = UDim.new(0, 4)
+			SFCorner.Parent = SliderFrame
+
+			Label.Size = UDim2.new(1, -20, 0, 20)
+			Label.Position = UDim2.new(0, 10, 0, 2)
+			Label.BackgroundTransparency = 1
+			Label.Font = Enum.Font.SourceSansSemibold
+			Label.Text = Title .. ": " .. Def
+			Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+			Label.TextSize = 14
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+
+			BarBg.Size = UDim2.new(1, -20, 0, 6)
+			BarBg.Position = UDim2.new(0, 10, 0, 28)
+			BarBg.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+			BarBg.Text = ""
+			BBCorner.CornerRadius = UDim.new(1, 0)
+			BBCorner.Parent = BarBg
+
+			Fill.Size = UDim2.new((Def - Min) / (Max - Min), 0, 1, 0)
+			Fill.BackgroundColor3 = Color3.fromRGB(75, 130, 230)
+			FillCorner.CornerRadius = UDim.new(1, 0)
+			FillCorner.Parent = Fill
+
+			local sliding = false
+			local function update(input)
+				local pos = math.clamp((input.Position.X - BarBg.AbsolutePosition.X) / BarBg.AbsoluteSize.X, 0, 1)
+				local value = math.floor(Min + ((Max - Min) * pos))
+				Util:Tween(Fill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.05)
+				Label.Text = Title .. ": " .. tostring(value)
+				task.spawn(Callback, value)
+			end
+
+			BarBg.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					sliding = true
+					update(input)
+				end
+			end)
+			UIS.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					sliding = false
+				end
+			end)
+			UIS.InputChanged:Connect(function(input)
+				if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+					update(input)
+				end
+			end)
+		end
+
+		-- ВЫПАДАЮЩИЙ СПИСОК (Dropdown) с адаптивной прокруткой списка под мобилки
+		function PageComponents:CreateDropdown(config)
+			config = config or {}
+			local Title = config.Title or config.Text or "Выпадающий список"
+			local Options = config.List or config.Array or {}
+			local Callback = config.Callback or function() end
+
+			local DropFrame = Instance.new("Frame", PageContent)
+			local DFCorner = Instance.new("UICorner")
+			local DropBtn = Instance.new("TextButton", DropFrame)
+			local Scroll = Instance.new("ScrollingFrame", DropFrame)
+			local SLayout = Instance.new("UIListLayout", Scroll)
+
+			DropFrame.Size = UDim2.new(1, -5, 0, 32)
+			DropFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			DropFrame.ClipsDescendants = true
+			DFCorner.CornerRadius = UDim.new(0, 4)
+			DFCorner.Parent = DropFrame
+
+			DropBtn.Size = UDim2.new(1, 0, 0, 32)
+			DropBtn.BackgroundTransparency = 1
+			DropBtn.Font = Enum.Font.SourceSansSemibold
+			DropBtn.Text = "  " .. Title .. "  ▼"
+			DropBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+			DropBtn.TextSize = 14
+			DropBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+			Scroll.Size = UDim2.new(1, 0, 1, -32)
+			Scroll.Position = UDim2.new(0, 0, 0, 32)
+			Scroll.BackgroundTransparency = 1
+			Scroll.ScrollBarThickness = 2
+			Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0)
+			SLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+			local isOpen = false
+			DropBtn.MouseButton1Click:Connect(function()
+				isOpen = not isOpen
+				local targetSize = isOpen and UDim2.new(1, -5, 0, math.min(32 + (#Options * 26), 136)) or UDim2.new(1, -5, 0, 32)
+				Util:Tween(DropFrame, {Size = targetSize}, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				DropBtn.Text = isOpen and "  " .. Title .. "  ▲" or "  " .. Title .. "  ▼"
+			end)
+
+			for _, opt in ipairs(Options) do
+				local optBtn = Instance.new("TextButton", Scroll)
+				optBtn.Size = UDim2.new(1, 0, 0, 25)
+				optBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 42)
+				optBtn.BackgroundTransparency = 0.2
+				optBtn.Font = Enum.Font.SourceSans
+				optBtn.Text = tostring(opt)
+				optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+				optBtn.TextSize = 14
+				Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 3)
+
+				optBtn.MouseButton1Click:Connect(function()
+					DropBtn.Text = "  " .. Title .. " : " .. tostring(opt) .. "  ▼"
+					isOpen = false
+					Util:Tween(DropFrame, {Size = UDim2.new(1, -5, 0, 32)}, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+					task.spawn(Callback, opt)
+				end)
+			end
+		end
+-- =============================================================================
+-- ЧАСТЬ 4: СИСТЕМА БИНДОВ (KEYBIND), ЗАКРЫТИЕ ИНТЕРФЕЙСА И ПРИМЕР ЗАПУСКА
+-- =============================================================================
+
+		-- КЛАВИША БИНДА (Keybind) — кастомный выбор кнопки активации функций (для ПК)
+		function PageComponents:CreateKeybind(config)
+			config = config or {}
+			local Title = config.Title or config.Text or "Назначить клавишу"
+			local Default = config.Default or Enum.KeyCode.E
+			local Callback = config.Callback or function() end
+
+			local BindFrame = Instance.new("Frame", PageContent)
+			local BFCorner = Instance.new("UICorner")
+			local Label = Instance.new("TextLabel", BindFrame)
+			local BindBtn = Instance.new("TextButton", BindFrame)
+			local BBCorner = Instance.new("UICorner")
+
+			BindFrame.Name = Title .. "_BindFrame"
+			BindFrame.Size = UDim2.new(1, -5, 0, 32)
+			BindFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			BFCorner.CornerRadius = UDim.new(0, 4)
+			BFCorner.Parent = BindFrame
+
+			Label.Size = UDim2.new(1, -100, 1, 0)
+			Label.Position = UDim2.new(0, 10, 0, 0)
+			Label.BackgroundTransparency = 1
+			Label.Font = Enum.Font.SourceSansSemibold
+			Label.Text = Title
+			Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+			Label.TextSize = 14
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+
+			BindBtn.Size = UDim2.new(0, 80, 0, 22)
+			BindBtn.Position = UDim2.new(1, -90, 0.5, -11)
+			BindBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+			BindBtn.Font = Enum.Font.SourceSansBold
+			BindBtn.Text = Default.Name
+			BindBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+			BindBtn.TextSize = 12
+			BBCorner.CornerRadius = UDim.new(0, 4)
+			BBCorner.Parent = BindBtn
+
+			local currentKey = Default
+			local listening = false
+
+			-- Логика ожидания нажатия новой клавиши
+			BindBtn.MouseButton1Click:Connect(function()
+				listening = true
+				BindBtn.Text = "..."
+				BindBtn.TextColor3 = Color3.fromRGB(255, 165, 0)
+			end)
+
+			UIS.InputBegan:Connect(function(input, processed)
+				if processed then return end
+				
+				if listening then
+					if input.UserInputType == Enum.UserInputType.Keyboard then
+						local key = input.KeyCode
+						-- Проверяем, не находится ли клавиша в черном списке
+						if not table.find(BlacklistedKeys, key) then
+							currentKey = key
+							BindBtn.Text = key.Name
+							listening = false
+							BindBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+						end
+					end
+				else
+					-- Если не слушаем новый бинд, то просто выполняем функцию при нажатии
+					if input.KeyCode == currentKey then
+						task.spawn(Callback)
+					end
+				end
+			end)
+		end
+
+		return PageComponents
+	end
+
+	return Elements
+end
+
+-----------------------------------------------------------------------------
+-- ШАБЛОН ДЛЯ ТЕСТИРОВАНИЯ (БОЙЛЕРПЛЕЙТ)
+-----------------------------------------------------------------------------
+
+-- Создаем главное окно
+local Window = WindowTable:CreateWindow({
+	Title = "Ar Du Galen (Delta Support)"
+})
+
+-- Создаем тестовые вкладки
+local MainTab = Window:CreatePage("Главная")
+local CombatTab = Window:CreatePage("Сражение")
+local MiscTab = Window:CreatePage("Разное")
+
+-- Наполняем вкладку "Главная" элементами
+MainTab:AddButton("Кликни меня", function()
+	print("Кнопка успешно работает!")
+end)
+
+MainTab:CreateToggle({
+	Title = "Включить аимбот (Пример)",
+	Default = false,
+	Callback = function(state)
+		print("Аимбот статус:", state)
+	end
+})
+
+MainTab:CreateSlider({
+	Text = "Скорость бега",
+	Min = 16,
+	Max = 150,
+	Default = 16,
+	Callback = function(value)
+		if Client.Character and Client.Character:FindFirstChild("Humanoid") then
+			Client.Character.Humanoid.WalkSpeed = value
+		end
+	end
+})
+
+MainTab:CreateDropdown({
+	Title = "Выбор локации",
+	List = {"Спавн", "Зона ПВП", "Магазин", "Лес"},
+	Callback = function(selectedOption)
+		print("Выбрана локация для телепорта:", selectedOption)
+	end
+})
+
+-- Добавляем бинд и кнопку во вкладку "Сражение"
+CombatTab:CreateKeybind({
+	Title = "Быстрое лечение (Бинд)",
+	Default = Enum.KeyCode.F,
+	Callback = function()
+		print("Кастомный бинд сработал! Кнопка нажата.")
+	end
+})
+
+CombatTab:AddButton("Kill Aura", function()
+	print("Функция Kill Aura запущена!")
+end)
+
+print("[UI Library]: Скрипт полностью загружен и готов к использованию!")
