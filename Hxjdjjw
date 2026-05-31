@@ -1,52 +1,54 @@
-do
-local Players = game:GetService("Players");
-local LocalPlayer = Players.LocalPlayer;
-local ReplicatedStorage = game:GetService("ReplicatedStorage");
-local UserInputService = game:GetService("UserInputService");
-local RunService = game:GetService("RunService");
-local TweenService = game:GetService("TweenService");
-local Workspace = game:GetService("Workspace");
-local VirtualInput = game:GetService("VirtualInputManager");
-local HttpService = game:GetService("HttpService");
+do 
+    local Players = game:GetService("Players");
+    local LocalPlayer = Players.LocalPlayer;
+    local ReplicatedStorage = game:GetService("ReplicatedStorage");
+    local UserInputService = game:GetService("UserInputService");
+    local RunService = game:GetService("RunService");
+    local TweenService = game:GetService("TweenService");
+    local Workspace = game:GetService("Workspace");
+    local VirtualInput = game:GetService("VirtualInputManager");
+    local HttpService = game:GetService("HttpService");
 
-local _G = {
-    EspEnabled = true,
-    InventoryCheck = true,
-    LogCheck = true,
-    GunEsp = true,
-    KillAura = false,
-    KillAuraRadius = 75,
-    WalkSpeedValue = 16,
-    JumpPowerValue = 50,
-    SpeedEnabled = false,
-    JumpEnabled = false,
-    NoclipEnabled = false,
-    SilentAim = false,
-    SilentAimSmoothness = 0.3,
-    SilentAimFOV = 100,
-    SilentAimHeadshot = true
-};
+    local _G = {
+        EspEnabled = true,
+        InventoryCheck = true,
+        LogCheck = true,
+        GunEsp = true,
+        KillAura = false,
+        KillAuraRadius = 75,
+        WalkSpeedValue = 16,
+        JumpPowerValue = 50,
+        SpeedEnabled = false,
+        JumpEnabled = false,
+        NoclipEnabled = false,
+        SilentAim = false,
+        SilentAimSmoothness = 0.3,
+        SilentAimFOV = 100,
+        SilentAimHeadshot = true
+    };
 
-local playerRoles = {};
-local silentAimTarget = nil;
-local isMinimized = false;
-local COLORS = {
-    Sheriff = Color3.fromRGB(0, 130, 255),
-    Murderer = Color3.fromRGB(255, 35, 35),
-    Innocent = Color3.fromRGB(45, 255, 85),
-    DroppedGun = Color3.fromRGB(255, 215, 0)
-};
-local WEAPONS = {
-    Knife = "Murderer", Blade = "Murderer", Sword = "Murderer",
-    Gun = "Sheriff", Revolver = "Sheriff", Pistol = "Sheriff"
-};
+    local playerRoles = {};
+    local silentAimTarget = nil;
+    local isMinimized = false;
 
-local sg = Instance.new("ScreenGui");
-sg.Name = "MM2_Prestige_Xeno";
-sg.Parent = (gethui and gethui()) or game:GetService("CoreGui");
-sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
+    local COLORS = {
+        Sheriff = Color3.fromRGB(0, 130, 255),
+        Murderer = Color3.fromRGB(255, 35, 35),
+        Innocent = Color3.fromRGB(45, 255, 85),
+        DroppedGun = Color3.fromRGB(255, 215, 0)
+    };
 
-function createMainMenu()
+    local WEAPONS = {
+        Knife = "Murderer", Blade = "Murderer", Sword = "Murderer",
+        Gun = "Sheriff", Revolver = "Sheriff", Pistol = "Sheriff"
+    };
+
+    local sg = Instance.new("ScreenGui");
+    sg.Name = "MM2_Prestige_Xeno";
+    sg.Parent = (gethui and gethui()) or game:GetService("CoreGui");
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
+
+    -- Главное окно скрипта
     local MainFrame = Instance.new("Frame");
     MainFrame.Size = UDim2.new(0, 680, 0, 580);
     MainFrame.Position = UDim2.new(0.5, -340, 0.5, -290);
@@ -176,6 +178,31 @@ function createMainMenu()
     CloseCorner.CornerRadius = UDim.new(0, 8);
     CloseCorner.Parent = CloseBtn;
 
+    -- Мобильная полоска снизу (как на iPhone / Android) для вызова меню
+    local HomeBarContainer = Instance.new("Frame")
+    HomeBarContainer.Name = "HomeBarContainer"
+    HomeBarContainer.Size = UDim2.new(0, 140, 0, 12)
+    HomeBarContainer.Position = UDim2.new(0.5, -70, 1, -20) -- Позиция в самом низу экрана
+    HomeBarContainer.BackgroundTransparency = 1
+    HomeBarContainer.Active = true
+    HomeBarContainer.Visible = false -- Изначально скрыта, пока открыто меню
+    HomeBarContainer.Parent = sg
+
+    local HomeBar = Instance.new("TextButton")
+    HomeBar.Name = "HomeBar"
+    HomeBar.Size = UDim2.new(1, 0, 0, 5)
+    HomeBar.Position = UDim2.new(0, 0, 0.5, -2)
+    HomeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    HomeBar.BackgroundTransparency = 0.4
+    HomeBar.Text = ""
+    HomeBar.BorderSizePixel = 0
+    HomeBar.Parent = HomeBarContainer
+
+    local HomeBarCorner = Instance.new("UICorner")
+    HomeBarCorner.CornerRadius = UDim.new(1, 0)
+    HomeBarCorner.Parent = HomeBar
+
+    -- Обработка кнопки закрытия (Крестик) — скрывает меню и показывает полоску
     CloseBtn.MouseEnter:Connect(function()
         TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(200, 60, 60), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play();
     end);
@@ -183,8 +210,15 @@ function createMainMenu()
         TweenService:Create(CloseBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 35), TextColor3 = Color3.fromRGB(180, 180, 190)}):Play();
     end);
     CloseBtn.MouseButton1Click:Connect(function()
-        sg:Destroy();
+        MainFrame.Visible = false
+        HomeBarContainer.Visible = true
     end);
+
+    -- Клик по полоске снизу — открывает меню обратно и прячет полоску
+    HomeBar.MouseButton1Click:Connect(function()
+        HomeBarContainer.Visible = false
+        MainFrame.Visible = true
+    end)
 
     local minimized = false;
     local function toggleMinimize()
@@ -637,6 +671,7 @@ function createMainMenu()
             if (not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return; end
             local hrp = LocalPlayer.Character.HumanoidRootPart;
             local targetPlayer = nil;
+
             if flingMurdererActive then
                 for _, p in ipairs(Players:GetPlayers()) do
                     if ((playerRoles[p.Name] == "Murderer") and p.Character and p.Character:FindFirstChild("HumanoidRootPart")) then
@@ -650,6 +685,7 @@ function createMainMenu()
                     end
                 end
             end
+
             if targetPlayer then
                 local targetPos = targetPlayer.Character.HumanoidRootPart.Position;
                 local direction = (targetPos - hrp.Position).Unit;
@@ -670,99 +706,292 @@ function createMainMenu()
     end);
 
     createSlider(TrollingPage, "💥 Fling Power", 200, 800, 400, function(v) flingStrength = v; end);
-end
 
-RunService.Stepped:Connect(function()
-    if (_G.NoclipEnabled and LocalPlayer.Character) then
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false; end
-        end
-    end
-end);
-
-RunService.Stepped:Connect(function()
-    if (_G.SpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
-        local hrp = LocalPlayer.Character.HumanoidRootPart;
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid");
-        if (hum and (hum.MoveDirection.Magnitude > 0)) then
-            hrp.AssemblyLinearVelocity = hum.MoveDirection * _G.WalkSpeedValue;
-        end
-    end
-end);
-
-UserInputService.JumpRequest:Connect(function()
-    if (_G.JumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
-        local hrp = LocalPlayer.Character.HumanoidRootPart;
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid");
-        if (hum and (hum.FloorMaterial ~= Enum.Material.Air)) then
-            hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, _G.JumpPowerValue, hrp.AssemblyLinearVelocity.Z);
-        end
-    end
-end);
-
-local function getClosestPlayerInFOV()
-    if (not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return nil; end
-    local camera = Workspace.CurrentCamera;
-    local closestPlayer = nil;
-    local closestDistance = math.huge;
-    for _, player in ipairs(Players:GetPlayers()) do
-        if ((player ~= LocalPlayer) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid")) then
-            local targetHrp = player.Character.HumanoidRootPart;
-            local targetHum = player.Character.Humanoid;
-            if (targetHum.Health > 0) then
-                local screenPos, onScreen = camera:WorldToScreenPoint(targetHrp.Position);
-                if onScreen then
-                    local mousePos = UserInputService:GetMouseLocation();
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude;
-                    if ((distance <= _G.SilentAimFOV) and (distance < closestDistance)) then
-                        closestDistance = distance;
-                        closestPlayer = player;
-                    end
-                end
+    RunService.Stepped:Connect(function()
+        if (_G.NoclipEnabled and LocalPlayer.Character) then
+            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false; end
             end
         end
-    end
-    return closestPlayer;
-end
+    end);
 
-local function getTargetPosition(player)
-    if (not player or not player.Character) then return nil; end
-    if _G.SilentAimHeadshot then
-        local head = player.Character:FindFirstChild("Head");
-        if head then return head.Position; end
-    end
-    local hrp = player.Character:FindFirstChild("HumanoidRootPart");
-    return hrp and hrp.Position;
-end
+    RunService.Stepped:Connect(function()
+        if (_G.SpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
+            local hrp = LocalPlayer.Character.HumanoidRootPart;
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid");
+            if (hum and (hum.MoveDirection.Magnitude > 0)) then
+                hrp.AssemblyLinearVelocity = hum.MoveDirection * _G.WalkSpeedValue;
+            end
+        end
+    end);
 
-local oldMouse = nil;
-local toolConnection = nil;
-local function setupSilentAim()
-    if toolConnection then toolConnection:Disconnect(); end
-    toolConnection = LocalPlayer.CharacterAdded:Connect(function(character)
-        task.wait(0.5);
-        local tool = character:FindFirstChildOfClass("Tool");
-        if tool then
-            local gunCheck = tool.Name:lower():find("gun") or tool.Name:lower():find("revolver") or tool.Name:lower():find("pistol") or (tool.Name == "SheriffGun");
-            if gunCheck then
-                local mouse = LocalPlayer:GetMouse();
-                if not oldMouse then
-                    oldMouse = mouse.Button1Down;
-                    mouse.Button1Down = function()
-                        if (_G.SilentAim and (playerRoles[LocalPlayer.Name] == "Sheriff")) then
-                            local target = getClosestPlayerInFOV();
-                            if target then
-                                -- Здесь должен быть логический вызов выстрела
-                            end
+    UserInputService.JumpRequest:Connect(function()
+        if (_G.JumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
+            local hrp = LocalPlayer.Character.HumanoidRootPart;
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid");
+            if (hum and (hum.FloorMaterial ~= Enum.Material.Air)) then
+                hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, _G.JumpPowerValue, hrp.AssemblyLinearVelocity.Z);
+            end
+        end
+    end);
+
+    local function getClosestPlayerInFOV()
+        if (not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then return nil; end
+        local camera = Workspace.CurrentCamera;
+        local closestPlayer = nil;
+        local closestDistance = math.huge;
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if ((player ~= LocalPlayer) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid")) then
+                local targetHrp = player.Character.HumanoidRootPart;
+                local targetHum = player.Character.Humanoid;
+                if (targetHum.Health > 0) then
+                    local screenPos, onScreen = camera:WorldToScreenPoint(targetHrp.Position);
+                    if onScreen then
+                        local mousePos = UserInputService:GetMouseLocation();
+                        local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude;
+                        if ((distance <= _G.SilentAimFOV) and (distance < closestDistance)) then
+                            closestDistance = distance;
+                            closestPlayer = player;
                         end
                     end
                 end
             end
         end
-    end);
-end
+        return closestPlayer;
+    end
 
--- Моментальный запуск основного меню
-createMainMenu();
-setupSilentAim();
+    local function getTargetPosition(player)
+        if (not player or not player.Character) then return nil; end
+        if _G.SilentAimHeadshot then
+            local head = player.Character:FindFirstChild("Head");
+            if head then return head.Position; end
+        end
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart");
+        return hrp and hrp.Position;
+    end
+
+    local oldMouse = nil;
+    local toolConnection = nil;
+    local function setupSilentAim()
+        if toolConnection then toolConnection:Disconnect(); end
+        toolConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+            task.wait(0.5);
+            local tool = character:FindFirstChildOfClass("Tool");
+            if tool then
+                local gunCheck = tool.Name:lower():find("gun") or tool.Name:lower():find("revolver") or tool.Name:lower():find("pistol") or (tool.Name == "SheriffGun");
+                if gunCheck then
+                    local mouse = LocalPlayer:GetMouse();
+                    if not oldMouse then
+                        oldMouse = mouse.Button1Down;
+                        mouse.Button1Down = function()
+                            if (_G.SilentAim and (playerRoles[LocalPlayer.Name] == "Sheriff")) then
+                                local target = getClosestPlayerInFOV();
+                                if target then
+                                    local targetPos = getTargetPosition(target);
+                                    if targetPos then
+                                        local camera = Workspace.CurrentCamera;
+                                        local oldCFrame = camera.CFrame;
+                                        local direction = (targetPos - camera.CFrame.Position).Unit;
+                                        local newCFrame = CFrame.lookAt(camera.CFrame.Position, camera.CFrame.Position + direction);
+                                        camera.CFrame = oldCFrame:Lerp(newCFrame, 1 - _G.SilentAimSmoothness);
+                                        oldMouse();
+                                        task.wait(0.05);
+                                        camera.CFrame = oldCFrame;
+                                        return;
+                                    end
+                                end
+                            end
+                            oldMouse();
+                        end;
+                    end
+                end
+            end
+        end);
+    end
+    setupSilentAim();
+    LocalPlayer.CharacterAdded:Connect(setupSilentAim);
+
+    task.spawn(function()
+        local lastAttackTime = 0;
+        local attackCooldown = 0.1;
+        while true do
+            if _G.KillAura then
+                if (playerRoles[LocalPlayer.Name] == "Murderer") then
+                    local character = LocalPlayer.Character;
+                    if character then
+                        local hrp = character:FindFirstChild("HumanoidRootPart");
+                        local tool = character:FindFirstChildOfClass("Tool");
+                        if (tool and hrp) then
+                            local toolName = tool.Name:lower();
+                            local isKnife = toolName:find("knife") or toolName:find("blade") or toolName:find("sword");
+                            if isKnife then
+                                local now = tick();
+                                if ((now - lastAttackTime) >= attackCooldown) then
+                                    local closestTarget = nil;
+                                    local closestDistance = _G.KillAuraRadius + 1;
+                                    for _, player in ipairs(Players:GetPlayers()) do
+                                        if (player ~= LocalPlayer) then
+                                            local targetChar = player.Character;
+                                            if (targetChar and targetChar:FindFirstChild("HumanoidRootPart")) then
+                                                local targetHrp = targetChar.HumanoidRootPart;
+                                                local targetHum = targetChar:FindFirstChildOfClass("Humanoid");
+                                                if (targetHum and (targetHum.Health > 0)) then
+                                                    local distance = (targetHrp.Position - hrp.Position).Magnitude;
+                                                    if ((distance <= _G.KillAuraRadius) and (distance < closestDistance)) then
+                                                        closestDistance = distance;
+                                                        closestTarget = targetChar;
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                    if closestTarget then
+                                        local targetHrp = closestTarget:FindFirstChild("HumanoidRootPart");
+                                        if targetHrp then
+                                            hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(targetHrp.Position.X, hrp.Position.Y, targetHrp.Position.Z));
+                                            tool:Activate();
+                                            local handle = tool:FindFirstChild("Handle");
+                                            if (handle and firetouchinterest) then
+                                                firetouchinterest(handle, targetHrp, 0);
+                                                firetouchinterest(handle, targetHrp, 1);
+                                            end
+                                            lastAttackTime = now;
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.05);
+        end
+    end);
+
+    local function applyHighlight(player, role)
+        local character = player.Character;
+        if (not character or not _G.EspEnabled) then
+            if (character and character:FindFirstChild("RoleESP")) then character.RoleESP:Destroy(); end
+            return;
+        end
+        local color = COLORS[role] or COLORS.Innocent;
+        local h = character:FindFirstChild("RoleESP") or Instance.new("Highlight");
+        h.Name = "RoleESP";
+        h.Parent = character;
+        h.FillColor = color;
+        h.FillTransparency = 0.5;
+        h.OutlineColor = color;
+        h.OutlineTransparency = 0;
+        h.Enabled = true;
+    end
+
+    local function checkInventory(player)
+        if ((player == LocalPlayer) or not _G.InventoryCheck) then return nil; end
+        local character = player.Character;
+        local backpack = player:FindFirstChild("Backpack");
+        if character then
+            for _, item in ipairs(character:GetChildren()) do
+                if item:IsA("Tool") then
+                    for keyword, role in pairs(WEAPONS) do
+                        if item.Name:lower():find(keyword:lower()) then return role; end
+                    end
+                end
+            end
+        end
+        if backpack then
+            for _, item in ipairs(backpack:GetChildren()) do
+                if item:IsA("Tool") then
+                    for keyword, role in pairs(WEAPONS) do
+                        if item.Name:lower():find(keyword:lower()) then return role; end
+                    end
+                end
+            end
+        end
+        return nil;
+    end
+
+    task.spawn(function()
+        while true do
+            for _, player in ipairs(Players:GetPlayers()) do
+                if (player.Character and player.Character:FindFirstChild("HumanoidRootPart") and (player ~= LocalPlayer)) then
+                    local hrp = player.Character.HumanoidRootPart;
+                    local hum = player.Character:FindFirstChildOfClass("Humanoid");
+                    if not _G.EspEnabled then
+                        if player.Character:FindFirstChild("RoleESP") then player.Character.RoleESP:Destroy(); end
+                    else
+                        local det = checkInventory(player);
+                        if det then
+                            playerRoles[player.Name] = det;
+                            applyHighlight(player, det);
+                        elseif playerRoles[player.Name] then
+                            applyHighlight(player, playerRoles[player.Name]);
+                        else
+                            applyHighlight(player, "Innocent");
+                        end
+                    end
+                end
+            end
+            task.wait(0.25);
+        end
+    end);
+
+    local gameplayFolder = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Gameplay");
+    if gameplayFolder then
+        local roundStart = gameplayFolder:FindFirstChild("RoundStart");
+        if (roundStart and roundStart:IsA("RemoteEvent")) then
+            roundStart.OnClientEvent:Connect(function(...)
+                if not _G.LogCheck then return; end
+                local args = {...};
+                local rawData = args[2];
+                if (typeof(rawData) == "table") then
+                    table.clear(playerRoles);
+                    for _, c in ipairs(workspace:GetChildren()) do
+                        if c:FindFirstChild("RoleESP") then c.RoleESP:Destroy(); end
+                    end
+                    for key, value in pairs(rawData) do
+                        local name = nil;
+                        local details = nil;
+                        if ((typeof(key) == "string") and (typeof(value) == "table")) then
+                            name = key; details = value;
+                        elseif (typeof(value) == "string") then
+                            name = value;
+                        end
+                        if name then
+                            local targetPlayer = Players:FindFirstChild(name);
+                            if targetPlayer then
+                                local role = "Innocent";
+                                if details then
+                                    if ((details.Role == "Sheriff") or details.Sheriff or (details.Value == "Sheriff")) then
+                                        role = "Sheriff";
+                                    elseif ((details.Role == "Murderer") or details.Murderer or (details.Value == "Murderer")) then
+                                        role = "Murderer";
+                                    end
+                                end
+                                playerRoles[name] = role;
+                                applyHighlight(targetPlayer, role);
+                            end
+                        end
+                    end
+                end
+            end);
+        end
+
+        local roleSelect = gameplayFolder:FindFirstChild("RoleSelect");
+        if (roleSelect and roleSelect:IsA("RemoteEvent")) then
+            roleSelect.OnClientEvent:Connect(function(roleName)
+                if not _G.LogCheck then return; end
+                if (typeof(roleName) == "string") then
+                    playerRoles[LocalPlayer.Name] = roleName;
+                    applyHighlight(LocalPlayer, roleName);
+                end
+            end);
+        end
+    end
+
+    Players.PlayerRemoving:Connect(function(player)
+        playerRoles[player.Name] = nil;
+    end);
+
+    print("⚡ MM2 PRESTIGE XENO V4 READY");
 end
