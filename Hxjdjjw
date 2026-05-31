@@ -1,4 +1,4 @@
-do
+do 
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -35,7 +35,7 @@ do
         Sheriff = Color3.fromRGB(0, 130, 255),
         Murderer = Color3.fromRGB(255, 35, 35),
         Innocent = Color3.fromRGB(45, 255, 85),
-        DroppedGun = Color3.fromRGB(255, 0, 127) -- Изменено на Neon Pink
+        DroppedGun = Color3.fromRGB(255, 0, 127) 
     }
 
     local WEAPONS = {
@@ -51,7 +51,7 @@ do
         LightPurple = Color3.fromRGB(40, 20, 60),
         TextWhite = Color3.fromRGB(255, 255, 255),
         TextMuted = Color3.fromRGB(180, 150, 200),
-        GlassTransp = 0.35 -- Прозрачность матового стекла
+        GlassTransp = 0.35 
     }
 
     local sg = Instance.new("ScreenGui")
@@ -528,7 +528,7 @@ do
     createSlider(MovePage, "Скорость бега", 16, 100, 16, function(v) _G.WalkSpeedValue = v end)
     createToggle(MovePage, "Noclip (Проход сквозь стены)", _G.NoclipEnabled, function(v) _G.NoclipEnabled = v end)
     
-    createToggle(MovePage, "Auto-Collect Coins (Обход античита)", _G.AutoCoin, function(v) _G.AutoCoin = v end)
+    createToggle(MovePage, "Auto-Collect Coins (Обновленный код)", _G.AutoCoin, function(v) _G.AutoCoin = v end)
     createToggle(MovePage, "Auto-Win / AFK Farm (Невидимая база)", _G.AutoFarm, function(v) _G.AutoFarm = v end)
     createToggle(MovePage, "Auto-Grab Gun", _G.AutoGrabGun, function(v) _G.AutoGrabGun = v end)
 
@@ -642,9 +642,7 @@ do
     setupSilentAim()
     LocalPlayer.CharacterAdded:Connect(setupSilentAim)
 
-    -- Auto-Farm & Coins (Исправлено для обхода кика)
-    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
-
+    -- Auto-Farm & Coins (с интеграцией нового кода)
     task.spawn(function()
         while true do
             local character = LocalPlayer.Character
@@ -673,23 +671,24 @@ do
                     end
                 end
 
+                -- Интеграция твоего кода для автофарма монет
                 if _G.AutoCoin and not _G.AutoFarm then
-                    local coinContainer = Workspace:FindFirstChild("CoinContainer", true) or 
-                                          (Workspace:FindFirstChild("Normal") and Workspace.Normal:FindFirstChild("CoinContainer"))
-                    
-                    if coinContainer then
-                        for _, coin in ipairs(coinContainer:GetChildren()) do
-                            if coin:IsA("BasePart") and coin.Transparency < 1 then
-                                local tween = TweenService:Create(hrp, tweenInfo, {CFrame = coin.CFrame})
-                                tween:Play()
-                                tween.Completed:Wait()
-                                
-                                if firetouchinterest then
-                                    firetouchinterest(hrp, coin, 0)
-                                    task.wait(0.05)
-                                    firetouchinterest(hrp, coin, 1)
-                                end
-                                break
+                    for _, obj in pairs(Workspace:GetDescendants()) do
+                        -- Мгновенно прерываем цикл, если фарм отключили в интерфейсе
+                        if not _G.AutoCoin then break end 
+                        
+                        local name = obj.Name:lower()
+                        if (name:find("coin") or name:find("money") or name:find("gold")) and obj:IsA("BasePart") then
+                            
+                            if firetouchinterest then
+                                firetouchinterest(hrp, obj, 0)
+                                task.wait()
+                                firetouchinterest(hrp, obj, 1)
+                            else
+                                local savedPosition = hrp.CFrame
+                                hrp.CFrame = obj.CFrame
+                                task.wait(0.2)
+                                hrp.CFrame = savedPosition
                             end
                         end
                     end
@@ -717,7 +716,7 @@ do
                     if farmPlatform then farmPlatform:Destroy() end
                 end
             end
-            task.wait(0.3)
+            task.wait(0.2) -- Чуть уменьшил задержку для большей отзывчивости
         end
     end)
 
